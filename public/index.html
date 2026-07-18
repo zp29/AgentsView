@@ -1,0 +1,2202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>AgentsView · Agent 任务控制台</title>
+  <style>
+    :root {
+      --bg: #020611;
+      --surface: rgba(7, 15, 31, 0.88);
+      --surface-strong: #081225;
+      --surface-soft: rgba(12, 25, 47, 0.72);
+      --line: rgba(116, 156, 194, 0.22);
+      --line-strong: rgba(137, 185, 226, 0.38);
+      --text: #eef7ff;
+      --muted: #8ca3bb;
+      --dim: #7189a2;
+      --cyan: #58d5ff;
+      --cyan-rgb: 88, 213, 255;
+      --amber: #ffc35c;
+      --amber-rgb: 255, 195, 92;
+      --green: #55e6a5;
+      --green-rgb: 85, 230, 165;
+      --red: #ff7682;
+      --red-rgb: 255, 118, 130;
+      --display: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --body: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 22px;
+      --ease: cubic-bezier(.22, .8, .22, 1);
+      --header-h: 74px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      min-width: 320px;
+      min-height: 100dvh;
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 52% 32%, rgba(20, 76, 116, 0.14), transparent 29%),
+        radial-gradient(circle at 12% 84%, rgba(41, 98, 134, 0.09), transparent 26%),
+        linear-gradient(180deg, #030716 0%, #02050e 100%);
+      font: 400 16px/1.5 var(--body);
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    body::before {
+      opacity: 0.62;
+      background-image:
+        radial-gradient(circle at 7% 13%, rgba(181, 225, 255, .65) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 17% 49%, rgba(103, 191, 255, .35) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 31% 20%, rgba(181, 225, 255, .55) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 46% 78%, rgba(103, 191, 255, .45) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 62% 12%, rgba(181, 225, 255, .5) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 73% 63%, rgba(103, 191, 255, .38) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 88% 28%, rgba(181, 225, 255, .55) 0 1px, transparent 1.5px),
+        radial-gradient(circle at 95% 83%, rgba(103, 191, 255, .35) 0 1px, transparent 1.5px);
+      background-size: 420px 360px, 510px 460px, 560px 520px, 470px 410px, 610px 540px, 530px 450px, 570px 510px, 490px 430px;
+    }
+
+    body::after {
+      opacity: .15;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.92' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.26'/%3E%3C/svg%3E");
+    }
+
+    button { font: inherit; }
+    button, [role="button"] { touch-action: manipulation; }
+    button:focus-visible, [role="button"]:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 200;
+      transform: translateY(-160%);
+      padding: 10px 14px;
+      color: #001019;
+      background: var(--cyan);
+      border-radius: 8px;
+      font-weight: 700;
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .app-shell { min-height: 100dvh; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      min-height: var(--header-h);
+      display: grid;
+      grid-template-columns: minmax(250px, 1fr) auto auto;
+      align-items: center;
+      gap: 22px;
+      padding: 11px clamp(16px, 2.4vw, 34px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(2, 6, 17, .88);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+    .brand-mark {
+      position: relative;
+      flex: 0 0 42px;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+      border: 1px solid rgba(var(--cyan-rgb), .52);
+      clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%);
+      background: rgba(var(--cyan-rgb), .07);
+      box-shadow: 0 0 24px rgba(var(--cyan-rgb), .15) inset;
+    }
+    .brand-mark::after {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 12px currentColor;
+    }
+    .brand-copy { min-width: 0; }
+    .brand-copy strong {
+      display: block;
+      overflow: hidden;
+      color: var(--text);
+      font: 700 14px/1.15 var(--mono);
+      letter-spacing: .05em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .brand-copy span {
+      display: block;
+      margin-top: 5px;
+      color: var(--dim);
+      font: 650 10px/1 var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .bridge-status { display: flex; align-items: center; gap: 9px; }
+    .adapter {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--muted);
+      background: rgba(8, 18, 37, .64);
+      font: 650 10px/1 var(--mono);
+      white-space: nowrap;
+    }
+    .adapter i, .connection-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(var(--green-rgb), .7);
+    }
+    .adapter[data-enabled="false"] { color: var(--dim); opacity: .62; }
+    .adapter[data-enabled="false"] i { background: var(--dim); box-shadow: none; }
+    .adapter[data-enabled="demo"] i { background: var(--amber); box-shadow: 0 0 10px rgba(var(--amber-rgb), .7); }
+
+    .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+    .icon-button, .scope-button, .lang-switch {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: rgba(8, 18, 37, .64);
+      border-radius: 11px;
+    }
+    .scope-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 13px;
+      cursor: pointer;
+      font: 700 10px/1 var(--mono);
+      letter-spacing: .08em;
+    }
+    .scope-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+    .scope-button:hover { color: var(--text); border-color: var(--line-strong); }
+    .lang-switch { display: flex; align-items: center; padding: 2px; }
+    .lang-switch button {
+      min-width: 40px;
+      min-height: 44px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 8px;
+      color: var(--dim);
+      background: transparent;
+      cursor: pointer;
+      font: 700 10px/1 var(--mono);
+    }
+    .lang-switch button.active { color: #021019; background: var(--cyan); }
+
+    .prototype-strip {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 6px 16px;
+      color: #91a5b9;
+      border-bottom: 1px solid rgba(116, 156, 194, .13);
+      background: rgba(5, 11, 24, .68);
+      font: 650 10px/1.35 var(--mono);
+      text-align: center;
+      transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+    }
+    .prototype-strip svg { flex: 0 0 auto; width: 14px; height: 14px; fill: none; stroke: var(--cyan); stroke-width: 1.8; }
+    .prototype-strip[data-state="connected"] { color: #a9ddc7; border-bottom-color: rgba(var(--green-rgb), .16); }
+    .prototype-strip[data-state="connected"] svg { stroke: var(--green); }
+    .prototype-strip[data-state="connecting"] svg { stroke: var(--amber); animation: strip-pulse 1.2s ease-in-out infinite; }
+    .prototype-strip[data-state="offline"] { color: #ffc2c7; border-bottom-color: rgba(var(--red-rgb), .18); background: rgba(var(--red-rgb), .035); }
+    .prototype-strip[data-state="offline"] svg { stroke: var(--red); }
+    @keyframes strip-pulse { 50% { opacity: .38; } }
+
+    .workspace {
+      width: min(1680px, 100%);
+      min-height: calc(100dvh - var(--header-h) - 34px);
+      display: grid;
+      grid-template-columns: minmax(620px, 1fr) minmax(330px, 390px);
+      gap: 16px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .map-card, .inspector {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(8, 17, 35, .84), rgba(4, 10, 22, .9));
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .28), inset 0 1px rgba(255,255,255,.025);
+      overflow: hidden;
+    }
+
+    .map-card { min-height: 700px; display: grid; grid-template-rows: auto minmax(540px, 1fr) auto; }
+    .map-head {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 13px 18px;
+      border-bottom: 1px solid rgba(116, 156, 194, .15);
+      background: rgba(5, 12, 27, .68);
+    }
+    .breadcrumb-wrap { min-width: 0; }
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--dim);
+      font: 700 9px/1 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 17px; height: 1px; background: currentColor; }
+    .map-title {
+      margin: 7px 0 0;
+      overflow: hidden;
+      color: var(--text);
+      font: 650 clamp(18px, 1.6vw, 24px)/1.15 var(--display);
+      letter-spacing: .01em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .map-back {
+      min-width: 120px;
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: 11px;
+      color: #bdd1e3;
+      background: rgba(11, 24, 44, .76);
+      cursor: pointer;
+      font: 700 10px/1 var(--mono);
+      transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+    .map-back svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .map-back:hover { color: #fff; border-color: rgba(var(--cyan-rgb), .56); }
+    .map-card[data-view="root"] .map-back { visibility: hidden; pointer-events: none; }
+
+    .map-stage {
+      position: relative;
+      min-height: 540px;
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 47%, rgba(25, 89, 130, .12), transparent 35%),
+        linear-gradient(rgba(59, 107, 153, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 107, 153, .035) 1px, transparent 1px);
+      background-size: auto, 54px 54px, 54px 54px;
+    }
+    .map-stage::before {
+      content: "";
+      position: absolute;
+      inset: 11% 18%;
+      z-index: -1;
+      border: 1px solid rgba(65, 123, 170, .07);
+      border-radius: 50%;
+      box-shadow: 0 0 90px rgba(28, 91, 137, .06) inset;
+    }
+
+    .root-layer, .task-layer { position: absolute; inset: 0; transition: opacity 260ms var(--ease), transform 300ms var(--ease); }
+    .map-card[data-view="root"] .root-layer { opacity: 1; transform: scale(1); pointer-events: auto; }
+    .map-card[data-view="root"] .task-layer { opacity: 0; transform: scale(1.035); pointer-events: none; visibility: hidden; }
+    .map-card[data-view="detail"] .root-layer { opacity: 0; transform: scale(.96); pointer-events: none; visibility: hidden; }
+    .map-card[data-view="detail"] .task-layer { opacity: 1; transform: scale(1); pointer-events: auto; }
+
+    .routes { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    .route { fill: none; stroke-width: 1.4; stroke-dasharray: 4 8; vector-effect: non-scaling-stroke; }
+    .route-cyan { stroke: rgba(var(--cyan-rgb), .33); }
+    .route-amber { stroke: rgba(var(--amber-rgb), .39); }
+    .route-green { stroke: rgba(var(--green-rgb), .3); }
+
+    .category-node, .task-node {
+      position: absolute;
+      z-index: 3;
+      border: 0;
+      color: var(--cyan);
+      background: transparent;
+      cursor: pointer;
+      text-align: center;
+      font-family: var(--body);
+    }
+    .category-node { width: 220px; transform: translate(-50%, -50%); }
+    .category-node[data-status="running"] { left: 25%; top: 64%; color: var(--cyan); }
+    .category-node[data-status="approval"] { left: 50%; top: 30%; color: var(--amber); }
+    .category-node[data-status="completed"] { left: 75%; top: 64%; color: var(--green); }
+
+    .hex {
+      position: relative;
+      width: 132px;
+      height: 132px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto;
+      color: currentColor;
+      clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%);
+      background: currentColor;
+      filter: drop-shadow(0 0 20px rgba(var(--cyan-rgb), .2));
+      transition: transform 220ms var(--ease), filter 220ms ease;
+    }
+    .category-node[data-status="approval"] .hex { filter: drop-shadow(0 0 20px rgba(var(--amber-rgb), .2)); }
+    .category-node[data-status="completed"] .hex { filter: drop-shadow(0 0 20px rgba(var(--green-rgb), .18)); }
+    .hex::before {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      clip-path: inherit;
+      background: linear-gradient(145deg, #0a1930, #050c1b);
+    }
+    .hex::after {
+      content: "";
+      position: absolute;
+      inset: 17px;
+      clip-path: inherit;
+      border: 1px solid currentColor;
+      opacity: .3;
+    }
+    .category-node:hover .hex, .category-node:focus-visible .hex { transform: scale(1.045); filter: drop-shadow(0 0 29px currentColor); }
+    .category-count { position: relative; z-index: 2; font: 700 38px/1 var(--mono); text-shadow: 0 0 13px currentColor; }
+    .category-title { display: block; margin: 14px 0 5px; color: #eaf5ff; font: 650 16px/1.2 var(--display); }
+    .category-hint { display: block; margin: 0; color: var(--dim); font: 600 11px/1.35 var(--mono); }
+    .category-open { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; color: currentColor; font: 750 9px/1 var(--mono); letter-spacing: .08em; }
+    .category-open svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+    .task-node {
+      display: block;
+      width: 190px;
+      transform: translate(-50%, -50%);
+      color: var(--cyan);
+    }
+    .task-node[data-status="approval"] { color: var(--amber); }
+    .task-node[data-status="completed"] { color: var(--green); }
+    .task-core {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto;
+      color: currentColor;
+      clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%);
+      background: currentColor;
+      filter: drop-shadow(0 0 13px rgba(var(--cyan-rgb), .18));
+      transition: transform 180ms var(--ease);
+    }
+    .task-core::before { content: ""; position: absolute; inset: 5px; clip-path: inherit; background: #071328; }
+    .task-core svg { position: relative; z-index: 2; width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+    .task-node:hover .task-core { transform: scale(1.05); }
+    .task-node.selected .task-core::after {
+      content: "";
+      position: absolute;
+      inset: -14px;
+      border: 1px solid currentColor;
+      border-radius: 50%;
+      opacity: .62;
+      animation: selected-pulse 2.1s ease-in-out infinite;
+    }
+    .task-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 9px;
+      color: currentColor;
+      font: 750 9px/1 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .task-state i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+    .task-title { display: block; margin: 12px 0 5px; overflow: hidden; color: #dbeeff; font: 700 13px/1.15 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .task-meta { display: block; margin: 0; color: var(--dim); font: 650 9px/1.35 var(--mono); }
+    .empty-map {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 2;
+      width: min(320px, calc(100% - 36px));
+      transform: translate(-50%, -50%);
+      padding: 22px 18px;
+      color: var(--muted);
+      border: 1px dashed var(--line-strong);
+      border-radius: 15px;
+      background: rgba(5, 13, 29, .74);
+      font: 650 11px/1.6 var(--mono);
+      text-align: center;
+    }
+    .empty-map[hidden] { display: none; }
+
+    @keyframes selected-pulse {
+      0%, 100% { opacity: .34; transform: scale(.94); }
+      50% { opacity: .82; transform: scale(1.06); }
+    }
+
+    .map-footer {
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 11px 18px;
+      border-top: 1px solid rgba(116, 156, 194, .15);
+      color: var(--dim);
+      background: rgba(5, 12, 27, .68);
+      font: 600 10px/1.4 var(--mono);
+    }
+    .legend { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); }
+    .legend .amber { background: var(--amber); }
+    .legend .green { background: var(--green); }
+    .updated-at { white-space: nowrap; }
+
+    .inspector {
+      min-height: 700px;
+      display: flex;
+      flex-direction: column;
+    }
+    .inspector-head {
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(116, 156, 194, .15);
+      background: rgba(5, 12, 27, .68);
+    }
+    .inspector-head strong { display: block; font: 700 13px/1.2 var(--mono); }
+    .inspector-head span { display: block; margin-top: 5px; color: var(--dim); font: 650 9px/1 var(--mono); letter-spacing: .08em; }
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 32px;
+      padding: 0 9px;
+      color: var(--green);
+      border: 1px solid rgba(var(--green-rgb), .25);
+      border-radius: 999px;
+      background: rgba(var(--green-rgb), .055);
+      font: 750 8px/1 var(--mono);
+      letter-spacing: .08em;
+    }
+    .live-pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+    .live-pill[data-state="connecting"] { color: var(--amber); border-color: rgba(var(--amber-rgb), .25); background: rgba(var(--amber-rgb), .05); }
+    .live-pill[data-state="offline"] { color: var(--red); border-color: rgba(var(--red-rgb), .28); background: rgba(var(--red-rgb), .055); }
+    .inspector-body { flex: 1; padding: 16px; overflow-y: auto; }
+
+    .overview-panel h2 { margin: 2px 0 9px; font: 650 22px/1.18 var(--display); }
+    .overview-panel > p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .flow-steps { display: grid; gap: 8px; margin-top: 18px; }
+    .flow-step {
+      display: grid;
+      grid-template-columns: 31px 1fr;
+      gap: 11px;
+      align-items: center;
+      min-height: 58px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(10, 22, 41, .55);
+    }
+    .flow-step b { width: 31px; height: 31px; display: grid; place-items: center; color: var(--cyan); border: 1px solid rgba(var(--cyan-rgb), .35); border-radius: 9px; font: 700 11px/1 var(--mono); }
+    .flow-step strong { display: block; color: #dcecff; font-size: 13px; }
+    .flow-step span { display: block; margin-top: 3px; color: var(--dim); font-size: 11px; }
+    .boundary-note {
+      margin-top: 16px;
+      padding: 13px;
+      color: #9fb2c6;
+      border: 1px solid rgba(var(--amber-rgb), .2);
+      border-radius: 12px;
+      background: rgba(var(--amber-rgb), .045);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .boundary-note strong { display: block; margin-bottom: 5px; color: var(--amber); font: 750 9px/1 var(--mono); letter-spacing: .09em; }
+
+    .task-panel { display: none; }
+    .task-panel.active { display: block; animation: panel-in 260ms var(--ease) both; }
+    @keyframes panel-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+    .detail-state {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .status-label, .risk-label, .source-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 0 9px;
+      border: 1px solid rgba(var(--cyan-rgb), .28);
+      border-radius: 999px;
+      color: var(--cyan);
+      background: rgba(var(--cyan-rgb), .05);
+      font: 750 8px/1 var(--mono);
+      letter-spacing: .07em;
+    }
+    .status-label.approval { color: var(--amber); border-color: rgba(var(--amber-rgb), .3); background: rgba(var(--amber-rgb), .05); }
+    .status-label.completed { color: var(--green); border-color: rgba(var(--green-rgb), .28); background: rgba(var(--green-rgb), .05); }
+    .status-label i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; }
+    .source-label { color: var(--muted); border-color: var(--line); background: rgba(255,255,255,.018); }
+    .task-panel h2 { margin: 0; overflow-wrap: anywhere; font: 700 21px/1.22 var(--mono); }
+    .task-summary { margin: 9px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+    .meta-card { min-height: 66px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 11px; background: rgba(9, 21, 40, .5); }
+    .meta-card span { display: block; color: var(--dim); font: 650 8px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .meta-card strong { display: block; margin-top: 7px; overflow: hidden; color: #dcecff; font: 650 11px/1.3 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .detail-section { margin-top: 16px; }
+    .section-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--dim); font: 700 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .code-block, .activity-block, .result-block {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: #c9e4f5;
+      background: #040b18;
+      font: 600 11px/1.65 var(--mono);
+      overflow-wrap: anywhere;
+    }
+    .code-block { position: relative; padding-left: 31px; color: #ffd17c; }
+    .code-block::before { content: ">"; position: absolute; left: 12px; color: var(--dim); }
+    .activity-line { display: grid; grid-template-columns: 9px 1fr auto; gap: 8px; align-items: start; }
+    .activity-line + .activity-line { margin-top: 9px; }
+    .activity-line i { width: 5px; height: 5px; margin-top: 6px; border-radius: 50%; background: var(--cyan); }
+    .activity-line span { color: #a9bfd2; }
+    .activity-line time { color: var(--dim); font-size: 8px; white-space: nowrap; }
+    .result-block { color: #bcebd6; border-color: rgba(var(--green-rgb), .22); background: rgba(var(--green-rgb), .035); }
+    .reason-card {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(var(--amber-rgb), .22);
+      border-radius: 12px;
+      color: #aebfd0;
+      background: rgba(var(--amber-rgb), .045);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .reason-card svg { width: 20px; height: 20px; fill: none; stroke: var(--amber); stroke-width: 1.7; }
+    .risk-label { color: var(--green); border-color: rgba(var(--green-rgb), .27); background: rgba(var(--green-rgb), .05); }
+    .risk-label.medium { color: var(--amber); border-color: rgba(var(--amber-rgb), .3); background: rgba(var(--amber-rgb), .05); }
+    .risk-label.high { color: var(--red); border-color: rgba(var(--red-rgb), .34); background: rgba(var(--red-rgb), .06); }
+    .approval-actions { display: grid; gap: 9px; margin-top: 17px; }
+    .primary-action, .deny-action, .secondary-action {
+      min-height: 50px;
+      border-radius: 12px;
+      cursor: pointer;
+      font: 750 11px/1 var(--mono);
+      letter-spacing: .06em;
+      transition: filter 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+    .primary-action { border: 0; color: #00160d; background: var(--green); box-shadow: 0 0 28px rgba(var(--green-rgb), .13); }
+    .primary-action:hover { filter: brightness(1.08); }
+    .deny-action { border: 1px solid rgba(var(--red-rgb), .35); color: #ff98a1; background: rgba(var(--red-rgb), .055); }
+    .deny-action:hover { border-color: rgba(var(--red-rgb), .6); background: rgba(var(--red-rgb), .09); }
+    .secondary-action { border: 1px solid var(--line-strong); color: #c4d7e8; background: rgba(11, 24, 44, .76); }
+    .primary-action:disabled, .deny-action:disabled { opacity: .48; cursor: wait; }
+    .action-note { margin: 9px 2px 0; color: var(--dim); font-size: 11px; line-height: 1.55; text-align: center; }
+    .approval-queue { display: flex; gap: 7px; margin-top: 13px; overflow-x: auto; scrollbar-width: thin; }
+    .approval-chip {
+      flex: 0 0 auto;
+      min-height: 44px;
+      padding: 0 11px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(8, 18, 37, .66);
+      cursor: pointer;
+      font: 700 9px/1 var(--mono);
+    }
+    .approval-chip.active { color: var(--amber); border-color: rgba(var(--amber-rgb), .42); background: rgba(var(--amber-rgb), .06); }
+    .approval-state-note { margin-top: 12px; padding: 11px; color: var(--amber); border: 1px solid rgba(var(--amber-rgb), .2); border-radius: 11px; background: rgba(var(--amber-rgb), .04); font: 650 10px/1.5 var(--mono); }
+
+    .scope-dialog, .confirm-dialog {
+      width: min(610px, calc(100% - 28px));
+      max-height: calc(100dvh - 28px);
+      padding: 0;
+      color: var(--text);
+      border: 1px solid var(--line-strong);
+      border-radius: 20px;
+      background: #071225;
+      box-shadow: 0 28px 90px rgba(0,0,0,.66);
+      overflow: hidden;
+    }
+    dialog::backdrop { background: rgba(0, 3, 10, .72); backdrop-filter: blur(7px); }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .dialog-head strong { font: 700 14px/1.2 var(--mono); }
+    .dialog-close { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: rgba(255,255,255,.02); cursor: pointer; }
+    .dialog-close svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .dialog-body { padding: 18px; overflow-y: auto; }
+    .dialog-intro { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .scope-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .scope-column { padding: 13px; border: 1px solid var(--line); border-radius: 13px; background: rgba(11, 24, 44, .52); }
+    .scope-column h3 { margin: 0 0 10px; color: var(--green); font: 750 10px/1 var(--mono); letter-spacing: .08em; }
+    .scope-column.deferred h3 { color: var(--amber); }
+    .scope-column ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .scope-column li { position: relative; padding-left: 15px; color: #aec0d1; font-size: 12px; line-height: 1.45; }
+    .scope-column li::before { content: ""; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .adapter-note { margin-top: 11px; padding: 12px; border: 1px solid rgba(var(--cyan-rgb), .2); border-radius: 12px; color: #a9c7dc; background: rgba(var(--cyan-rgb), .04); font-size: 12px; line-height: 1.55; }
+    .confirm-dialog { width: min(470px, calc(100% - 28px)); }
+    .confirm-command { margin: 12px 0 0; }
+    .confirm-actions { display: grid; grid-template-columns: 1fr 1.35fr; gap: 9px; margin-top: 16px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      z-index: 120;
+      min-width: min(420px, calc(100% - 28px));
+      max-width: calc(100% - 28px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 13px 16px;
+      color: #c9f6e2;
+      border: 1px solid rgba(var(--green-rgb), .3);
+      border-radius: 12px;
+      background: rgba(5, 28, 20, .96);
+      box-shadow: 0 18px 52px rgba(0,0,0,.45);
+      font: 650 11px/1.4 var(--mono);
+      opacity: 0;
+      transform: translate(-50%, 14px);
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 220ms var(--ease);
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast svg { width: 17px; height: 17px; fill: none; stroke: var(--green); stroke-width: 2; }
+    .toast.error { color: #ffd0d4; border-color: rgba(var(--red-rgb), .34); background: rgba(39, 8, 14, .97); }
+    .toast.error svg { stroke: var(--red); }
+
+    .login-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(var(--cyan-rgb), .1), transparent 27%),
+        rgba(1, 4, 12, .91);
+      backdrop-filter: blur(17px);
+    }
+    .login-gate[hidden] { display: none; }
+    .login-orbit {
+      position: absolute;
+      width: min(520px, 86vw);
+      aspect-ratio: 1;
+      border: 1px solid rgba(var(--cyan-rgb), .1);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .login-orbit::before, .login-orbit::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 18px rgba(var(--cyan-rgb), .75);
+    }
+    .login-orbit::before { top: 17%; left: 8%; width: 5px; height: 5px; }
+    .login-orbit::after { right: 11%; bottom: 21%; width: 3px; height: 3px; }
+    .login-card {
+      position: relative;
+      width: min(430px, 100%);
+      padding: clamp(24px, 5vw, 36px);
+      border: 1px solid var(--line-strong);
+      border-radius: 22px;
+      background: linear-gradient(155deg, rgba(10, 24, 47, .97), rgba(4, 10, 23, .98));
+      box-shadow: 0 36px 100px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.04);
+      overflow: hidden;
+    }
+    .login-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 25%;
+      right: 25%;
+      height: 1px;
+      background: var(--cyan);
+      box-shadow: 0 0 24px rgba(var(--cyan-rgb), .82);
+    }
+    .login-brand { display: flex; align-items: center; gap: 12px; color: var(--cyan); font: 750 11px/1 var(--mono); letter-spacing: .12em; }
+    .login-card-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .login-brand .brand-mark { flex-basis: 36px; width: 36px; height: 36px; }
+    .login-language { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: rgba(2, 8, 19, .62); }
+    .login-language button { min-width: 40px; min-height: 44px; padding: 0 7px; color: var(--dim); border: 0; border-radius: 7px; background: transparent; cursor: pointer; font: 750 9px/1 var(--mono); }
+    .login-language button.active { color: #00131b; background: var(--cyan); }
+    .login-card h1 { margin: 25px 0 9px; font: 650 clamp(24px, 7vw, 32px)/1.16 var(--display); letter-spacing: -.01em; }
+    .login-card > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .login-form { display: grid; gap: 10px; margin-top: 25px; }
+    .login-form label { color: var(--dim); font: 700 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .token-field {
+      width: 100%;
+      min-height: 52px;
+      padding: 0 14px;
+      color: var(--text);
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      outline: none;
+      background: #030a17;
+      font: 600 13px/1 var(--mono);
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+    .token-field:focus { border-color: rgba(var(--cyan-rgb), .7); box-shadow: 0 0 0 3px rgba(var(--cyan-rgb), .08); }
+    .login-submit { min-height: 52px; margin-top: 3px; border: 0; border-radius: 12px; color: #00131b; background: var(--cyan); cursor: pointer; font: 800 11px/1 var(--mono); letter-spacing: .08em; }
+    .login-submit:disabled { opacity: .58; cursor: wait; }
+    .login-error { min-height: 18px; margin: 2px 0 0; color: #ff9ca5; font: 650 10px/1.5 var(--mono); }
+    .login-foot { display: flex; align-items: flex-start; gap: 9px; margin-top: 19px; padding-top: 16px; color: var(--dim); border-top: 1px solid var(--line); font: 600 9px/1.55 var(--mono); }
+    .login-foot svg { flex: 0 0 auto; width: 15px; height: 15px; fill: none; stroke: var(--green); stroke-width: 1.8; }
+
+    @media (max-width: 1080px) {
+      .topbar { grid-template-columns: 1fr auto; }
+      .bridge-status { display: none; }
+      .workspace { grid-template-columns: minmax(0, 1fr) 350px; }
+    }
+
+    @media (max-width: 820px) {
+      :root { --header-h: 66px; }
+      .topbar { gap: 10px; padding: 9px 12px; }
+      .brand-mark { width: 38px; height: 38px; flex-basis: 38px; }
+      .brand-copy strong { font-size: 12px; }
+      .brand-copy span { display: none; }
+      .scope-button span { display: none; }
+      .scope-button { width: 44px; justify-content: center; padding: 0; }
+      .workspace { display: block; padding: 10px; }
+      .map-card { min-height: 590px; grid-template-rows: auto minmax(470px, 64dvh) auto; }
+      .inspector { min-height: 0; margin-top: 10px; }
+      .inspector-body { min-height: 420px; }
+      .map-head { min-height: 64px; padding: 10px 12px; }
+      .map-title { font-size: 17px; }
+      .map-back { min-width: 48px; width: 48px; padding: 0; }
+      .map-back span { display: none; }
+      .map-footer { padding: 10px 12px; }
+      .updated-at { display: none; }
+      .category-node { width: 150px; }
+      .hex { width: 106px; height: 106px; }
+      .category-count { font-size: 31px; }
+      .category-title { margin-top: 11px; font-size: 14px; }
+      .category-hint { display: none; }
+      .category-open { font-size: 8px; }
+      .category-node[data-status="running"] { left: 24%; top: 67%; }
+      .category-node[data-status="approval"] { left: 50%; top: 28%; }
+      .category-node[data-status="completed"] { left: 76%; top: 67%; }
+      .task-node { width: 132px; }
+      .task-core { width: 72px; height: 72px; }
+      .task-title { font-size: 10px; }
+      .task-meta { font-size: 8px; }
+      .task-state { font-size: 8px; }
+      .scope-columns { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 430px) {
+      #scopeButton { display: none; }
+      .lang-switch button { min-width: 44px; padding: 0 6px; }
+      .prototype-strip { font-size: 9px; }
+      .map-card { grid-template-rows: auto minmax(430px, 61dvh) auto; border-radius: 17px; }
+      .map-stage { min-height: 430px; }
+      .map-stage::before { inset: 10% 7%; }
+      .map-footer { min-height: 54px; }
+      .legend { gap: 9px; font-size: 8px; }
+      .category-node { width: 132px; }
+      .hex { width: 94px; height: 94px; }
+      .category-count { font-size: 28px; }
+      .category-node[data-status="running"] { left: 23%; top: 67%; }
+      .category-node[data-status="completed"] { left: 77%; top: 67%; }
+      .task-node { width: 116px; }
+      .task-core { width: 65px; height: 65px; }
+      .meta-grid { grid-template-columns: 1fr; }
+      .confirm-actions { grid-template-columns: 1fr; }
+      .scope-dialog, .confirm-dialog { max-height: calc(100dvh - 16px); }
+      .login-gate { padding: 12px; }
+      .login-card { border-radius: 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#constellationStage" data-i18n="skip">跳到星图</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-copy">
+          <strong>AGENTSVIEW</strong>
+          <span data-i18n="brandSub">本机任务监控与审批</span>
+        </div>
+      </div>
+
+      <div class="bridge-status" aria-label="Adapter status">
+        <div class="adapter" id="codexAdapter" data-enabled="false"><i></i>Codex app-server</div>
+        <div class="adapter" id="claudeAdapter" data-enabled="false"><i></i>Claude Agent SDK</div>
+      </div>
+
+      <div class="top-actions">
+        <button class="scope-button" id="scopeButton" type="button" data-i18n-aria="scopeAria">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>
+          <span data-i18n="scope">MVP 范围</span>
+        </button>
+        <button class="scope-button" id="logoutButton" type="button" data-i18n-aria="logoutAria">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg>
+          <span data-i18n="logout">退出</span>
+        </button>
+        <div class="lang-switch" aria-label="Language">
+          <button class="active" type="button" data-lang="zh" aria-pressed="true">中</button>
+          <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="prototype-strip" id="connectionStrip" data-state="connecting">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3.5 19h17zM12 8v5m0 3h.01"/></svg>
+      <span id="connectionText">正在连接本机 Bridge…</span>
+    </div>
+
+    <main class="workspace" id="mainContent">
+      <section class="map-card" id="mapCard" data-view="root" data-filter="root" aria-labelledby="mapTitle">
+        <header class="map-head">
+          <div class="breadcrumb-wrap">
+            <div class="eyebrow" id="breadcrumb">状态总览 / 第 1 层</div>
+            <h1 class="map-title" id="mapTitle">选择一种状态进入任务星图</h1>
+          </div>
+          <button class="map-back" id="mapBack" type="button" data-i18n-aria="backOverview">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+            <span data-i18n="backOverview">返回总览</span>
+          </button>
+        </header>
+
+        <div class="map-stage" id="constellationStage" tabindex="-1">
+          <div class="root-layer" id="rootLayer">
+            <svg class="routes" viewBox="0 0 1200 700" preserveAspectRatio="none" aria-hidden="true">
+              <path class="route route-amber" d="M600 210 C470 280 360 345 300 448"/>
+              <path class="route route-green" d="M600 210 C730 280 840 345 900 448"/>
+              <path class="route route-cyan" d="M300 448 C500 555 700 555 900 448"/>
+              <circle cx="600" cy="350" r="230" fill="none" stroke="rgba(88,213,255,.06)" stroke-width="1" stroke-dasharray="4 13"/>
+            </svg>
+            <button class="category-node" type="button" data-status="running">
+              <span class="hex"><span class="category-count" data-count="running">3</span></span>
+              <span class="category-title" data-i18n="running">运行中</span>
+              <span class="category-hint" data-i18n="runningHint">观察当前动作与运行时间</span>
+              <span class="category-open"><span data-i18n="enterMap">进入星图</span><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span>
+            </button>
+            <button class="category-node" type="button" data-status="approval">
+              <span class="hex"><span class="category-count" data-count="approval">2</span></span>
+              <span class="category-title" data-i18n="approval">待审批</span>
+              <span class="category-hint" data-i18n="approvalHint">查看风险并做一次性决策</span>
+              <span class="category-open"><span data-i18n="enterMap">进入星图</span><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span>
+            </button>
+            <button class="category-node" type="button" data-status="completed">
+              <span class="hex"><span class="category-count" data-count="completed">1</span></span>
+              <span class="category-title" data-i18n="completed">已完成</span>
+              <span class="category-hint" data-i18n="completedHint">查看结果摘要与耗时</span>
+              <span class="category-open"><span data-i18n="enterMap">进入星图</span><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span>
+            </button>
+          </div>
+
+          <div class="task-layer" id="taskLayer">
+            <svg class="routes" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
+              <g id="taskRoutes"></g>
+            </svg>
+            <div id="taskNodes"></div>
+            <div class="empty-map" id="emptyMap" hidden></div>
+          </div>
+        </div>
+
+        <footer class="map-footer">
+          <div class="legend">
+            <span><i></i><span data-i18n="running">运行中</span></span>
+            <span><i class="amber"></i><span data-i18n="approval">待审批</span></span>
+            <span><i class="green"></i><span data-i18n="completed">已完成</span></span>
+          </div>
+          <div class="updated-at"><span data-i18n="lastSync">最后同步</span> · <span id="syncTime">刚刚</span></div>
+        </footer>
+      </section>
+
+      <aside class="inspector" id="inspector" aria-labelledby="inspectorTitle">
+        <header class="inspector-head">
+          <div>
+            <strong id="inspectorTitle" data-i18n="taskDetails">任务详情</strong>
+            <span data-i18n="localBridge">本机 BRIDGE · 状态流 · 受限决策通道</span>
+          </div>
+          <div class="live-pill" id="livePill"><i></i><span id="liveText" data-i18n="connecting">连接中</span></div>
+        </header>
+        <div class="inspector-body" id="inspectorBody">
+          <div class="overview-panel" id="overviewPanel">
+            <div class="eyebrow" data-i18n="reviewedFlow">审查后的核心流程</div>
+            <h2 data-i18n="focusTitle">只做监控与审批</h2>
+            <p data-i18n="focusBody">第一阶段不复制 IDE。用户先看状态，再进入同类任务星图，最后只对需要处理的任务做一次性决策。</p>
+            <div class="flow-steps">
+              <div class="flow-step"><b>01</b><div><strong data-i18n="flowStatus">选择状态</strong><span data-i18n="flowStatusSub">运行中、待审批、已完成</span></div></div>
+              <div class="flow-step"><b>02</b><div><strong data-i18n="flowTask">选择任务</strong><span data-i18n="flowTaskSub">查看来源、项目与当前动作</span></div></div>
+              <div class="flow-step"><b>03</b><div><strong data-i18n="flowDecision">必要时决策</strong><span data-i18n="flowDecisionSub">仅允许本次，或拒绝</span></div></div>
+            </div>
+            <div class="boundary-note">
+              <strong data-i18n="importantBoundary">重要实现边界</strong>
+              <span data-i18n="boundaryBody">Bridge 必须托管 Agent 会话。普通终端里已经独立运行的进程，只能做有限监听，无法稳定地从网页回传审批。</span>
+            </div>
+          </div>
+          <div class="task-panel" id="taskPanel"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div class="login-gate" id="loginGate" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="login-orbit" aria-hidden="true"></div>
+    <section class="login-card">
+      <div class="login-card-head">
+        <div class="login-brand"><div class="brand-mark" aria-hidden="true"></div><span>AGENTSVIEW</span></div>
+        <div class="login-language" aria-label="Language">
+          <button class="active" type="button" data-lang="zh" aria-pressed="true">中</button>
+          <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        </div>
+      </div>
+      <h1 id="loginTitle" data-i18n="loginTitle">连接你的 Agent 星图</h1>
+      <p data-i18n="loginIntro">输入本机 AgentsView 的访问令牌。令牌只用于换取安全会话，AgentsView 不会将它写入浏览器存储。</p>
+      <form class="login-form" id="loginForm">
+        <label for="accessToken" data-i18n="accessToken">访问令牌</label>
+        <input class="token-field" id="accessToken" name="token" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" required data-i18n-placeholder="tokenPlaceholder" placeholder="粘贴访问令牌" />
+        <button class="login-submit" id="loginSubmit" type="submit" data-i18n="connect">安全连接</button>
+        <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
+      </form>
+      <div class="login-foot">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2M5 10h14v10H5z"/></svg>
+        <span data-i18n="loginSecurity">会话使用 HttpOnly Cookie；访问令牌不会写入 localStorage 或 URL。</span>
+      </div>
+    </section>
+  </div>
+
+  <dialog class="scope-dialog" id="scopeDialog" aria-labelledby="scopeTitle">
+    <header class="dialog-head">
+      <strong id="scopeTitle" data-i18n="scopeTitle">第一阶段功能边界</strong>
+      <button class="dialog-close" type="button" data-close-dialog aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <div class="dialog-body">
+      <p class="dialog-intro" data-i18n="scopeIntro">审查后把产品收敛为“本机 Agent 状态与审批入口”。这能在较短周期内做成，也为后续功能保留清晰接口。</p>
+      <div class="scope-columns">
+        <section class="scope-column">
+          <h3 data-i18n="included">第一阶段保留</h3>
+          <ul>
+            <li data-i18n="keep1">三个状态入口与任务下钻</li>
+            <li data-i18n="keep2">实时状态、当前动作和结果摘要</li>
+            <li data-i18n="keep3">单次允许与拒绝</li>
+            <li data-i18n="keep4">中英文与手机适配</li>
+            <li data-i18n="keep5">本机登录、审计记录和断线提示</li>
+          </ul>
+        </section>
+        <section class="scope-column deferred">
+          <h3 data-i18n="deferred">延后，避免臃肿</h3>
+          <ul>
+            <li data-i18n="defer1">完整终端、聊天与文件浏览器</li>
+            <li data-i18n="defer2">永久允许规则与批量审批</li>
+            <li data-i18n="defer3">跨供应商精确费用核算</li>
+            <li data-i18n="defer4">任意命令输入、暂停与接管</li>
+            <li data-i18n="defer5">多主机、团队权限与公网部署</li>
+          </ul>
+        </section>
+      </div>
+      <div class="adapter-note" data-i18n="adapterNote">接入建议：Codex 使用 app-server 的线程状态与审批请求；Claude Code 优先使用 Agent SDK 的 canUseTool 回调。Hooks 更适合作为通知和兼容层。</div>
+    </div>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="confirmDialog" aria-labelledby="confirmTitle">
+    <header class="dialog-head">
+      <strong id="confirmTitle" data-i18n="confirmExternal">确认外部写入</strong>
+      <button class="dialog-close" type="button" data-close-confirm aria-label="Close">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <div class="dialog-body">
+      <p class="dialog-intro" data-i18n="confirmBody">该命令会修改远程状态。请再次确认只允许当前这一次请求。</p>
+      <div class="code-block confirm-command" id="confirmCommand"></div>
+      <div class="confirm-actions">
+        <button class="secondary-action" type="button" data-close-confirm data-i18n="cancel">取消</button>
+        <button class="primary-action" type="button" id="confirmAllow" data-i18n="confirmOnce">确认，仅本次</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 12 4 4 8-9"/></svg>
+    <span id="toastText"></span>
+  </div>
+
+  <script>
+    (() => {
+      const translations = {
+        zh: {
+          skip: '跳到星图', brandSub: '本机任务监控与审批', scope: 'MVP 范围', scopeAria: '查看第一阶段功能边界',
+          prototypeNotice: '交互原型：按钮会模拟状态变化，不会执行真实命令。', backOverview: '返回总览',
+          running: '运行中', approval: '待审批', completed: '已完成', runningHint: '观察当前动作与运行时间',
+          approvalHint: '查看风险并做一次性决策', completedHint: '查看结果摘要与耗时', enterMap: '进入星图',
+          lastSync: '最后同步', taskDetails: '任务详情', localBridge: '本机 BRIDGE · 只读状态流', live: '实时',
+          reviewedFlow: '审查后的核心流程', focusTitle: '只做监控与审批',
+          focusBody: '第一阶段不复制 IDE。用户先看状态，再进入同类任务星图，最后只对需要处理的任务做一次性决策。',
+          flowStatus: '选择状态', flowStatusSub: '运行中、待审批、已完成', flowTask: '选择任务',
+          flowTaskSub: '查看来源、项目与当前动作', flowDecision: '必要时决策', flowDecisionSub: '仅允许本次，或拒绝',
+          importantBoundary: '重要实现边界', boundaryBody: 'Bridge 必须托管 Agent 会话。普通终端里已经独立运行的进程，只能做有限监听，无法稳定地从网页回传审批。',
+          scopeTitle: '第一阶段功能边界', scopeIntro: '审查后把产品收敛为“本机 Agent 状态与审批入口”。这能在较短周期内做成，也为后续功能保留清晰接口。',
+          included: '第一阶段保留', deferred: '延后，避免臃肿', keep1: '三个状态入口与任务下钻', keep2: '实时状态、当前动作和结果摘要',
+          keep3: '单次允许与拒绝', keep4: '中英文与手机适配', keep5: '本机登录、审计记录和断线提示',
+          defer1: '完整终端、聊天与文件浏览器', defer2: '永久允许规则与批量审批', defer3: '跨供应商精确费用核算',
+          defer4: '任意命令输入、暂停与接管', defer5: '多主机、团队权限与公网部署',
+          adapterNote: '接入建议：Codex 使用 app-server 的线程状态与审批请求；Claude Code 优先使用 Agent SDK 的 canUseTool 回调。Hooks 更适合作为通知和兼容层。',
+          confirmExternal: '确认外部写入', confirmBody: '该命令会修改远程状态。请再次确认只允许当前这一次请求。', cancel: '取消', confirmOnce: '确认，仅本次',
+          overviewCrumb: '状态总览 / 第 1 层', overviewTitle: '选择一种状态进入任务星图',
+          runningCrumb: '状态总览 / 运行中', runningTitle: '正在执行的任务', approvalCrumb: '状态总览 / 待审批', approvalTitle: '等待你决策的任务',
+          completedCrumb: '状态总览 / 已完成', completedTitle: '最近完成的任务',
+          source: '来源', project: '项目', elapsed: '耗时', updated: '更新', currentAction: '当前动作', recentEvents: '最近事件',
+          approvalReason: '为什么需要审批', workingDirectory: '工作目录', risk: '风险', lowRisk: '低风险', mediumRisk: '中风险 · 外部写入',
+          allowOnce: '仅允许本次', deny: '拒绝', allowNote: '不会创建永久权限规则；所有决策写入本机审计日志。',
+          result: '结果摘要', duration: '总耗时', filesChanged: '变更文件', viewOnly: '已完成任务为只读，不提供重跑或终端控制。',
+          decisionPending: '正在回传决策…', allowedToast: '已允许一次，任务已返回运行中', deniedToast: '已拒绝，Agent 将根据结果重新规划',
+          selected: '已选择', justNow: '刚刚', secondsAgo: '秒前'
+        },
+        en: {
+          skip: 'Skip to constellation', brandSub: 'LOCAL TASK MONITOR & APPROVALS', scope: 'MVP SCOPE', scopeAria: 'View phase-one product scope',
+          prototypeNotice: 'Interactive prototype: controls simulate state changes and never execute real commands.', backOverview: 'Back to overview',
+          running: 'Running', approval: 'Waiting approval', completed: 'Completed', runningHint: 'Watch current action and elapsed time',
+          approvalHint: 'Review risk and make a one-time decision', completedHint: 'Review result summary and duration', enterMap: 'Open map',
+          lastSync: 'Last sync', taskDetails: 'Task details', localBridge: 'LOCAL BRIDGE · READ-ONLY EVENT STREAM', live: 'LIVE',
+          reviewedFlow: 'REVIEWED CORE FLOW', focusTitle: 'Monitor and approve only',
+          focusBody: 'Phase one does not duplicate an IDE. Choose a status, enter its task map, then make one-time decisions only where needed.',
+          flowStatus: 'Choose a status', flowStatusSub: 'Running, waiting approval, completed', flowTask: 'Choose a task',
+          flowTaskSub: 'Inspect source, project, and current action', flowDecision: 'Decide when needed', flowDecisionSub: 'Allow once or deny',
+          importantBoundary: 'IMPLEMENTATION BOUNDARY', boundaryBody: 'The Bridge must own the Agent session. Processes already running independently in ordinary terminals can be observed only partially and cannot reliably receive web approvals.',
+          scopeTitle: 'Phase-one product scope', scopeIntro: 'The reviewed product is a local Agent status and approval entry point. It is practical to ship quickly and leaves clean interfaces for later expansion.',
+          included: 'IN PHASE ONE', deferred: 'DEFERRED TO STAY LEAN', keep1: 'Three status entries and task drilldown', keep2: 'Live state, current action, and result summary',
+          keep3: 'Allow once and deny', keep4: 'Chinese/English and mobile layout', keep5: 'Local auth, audit trail, and disconnect state',
+          defer1: 'Full terminal, chat, and file browser', defer2: 'Persistent rules and bulk approval', defer3: 'Exact cross-provider cost accounting',
+          defer4: 'Arbitrary command input, pause, and takeover', defer5: 'Multi-host, team roles, and public deployment',
+          adapterNote: 'Integration: use Codex app-server thread status and approval requests; use the Claude Agent SDK canUseTool callback first. Hooks are better as notification and compatibility layers.',
+          confirmExternal: 'Confirm external write', confirmBody: 'This command changes remote state. Confirm that you want to allow this request once.', cancel: 'Cancel', confirmOnce: 'Confirm once',
+          overviewCrumb: 'STATUS OVERVIEW / LEVEL 1', overviewTitle: 'Choose a status to enter its task map',
+          runningCrumb: 'STATUS OVERVIEW / RUNNING', runningTitle: 'Tasks currently executing', approvalCrumb: 'STATUS OVERVIEW / WAITING APPROVAL', approvalTitle: 'Tasks waiting for your decision',
+          completedCrumb: 'STATUS OVERVIEW / COMPLETED', completedTitle: 'Recently completed tasks',
+          source: 'Source', project: 'Project', elapsed: 'Elapsed', updated: 'Updated', currentAction: 'Current action', recentEvents: 'Recent events',
+          approvalReason: 'Why approval is required', workingDirectory: 'Working directory', risk: 'Risk', lowRisk: 'Low risk', mediumRisk: 'Medium · external write',
+          allowOnce: 'Allow once', deny: 'Deny', allowNote: 'No persistent permission rule is created. Every decision is written to the local audit trail.',
+          result: 'Result summary', duration: 'Duration', filesChanged: 'Files changed', viewOnly: 'Completed tasks are read-only. No rerun or terminal control in phase one.',
+          decisionPending: 'Sending decision…', allowedToast: 'Allowed once; task returned to running', deniedToast: 'Denied; the Agent will re-plan from the result',
+          selected: 'Selected', justNow: 'just now', secondsAgo: 's ago'
+        }
+      };
+
+      Object.assign(translations.zh, {
+        logout: '退出', logoutAria: '退出 AgentsView', connecting: '连接中',
+        loginTitle: '连接你的 Agent 星图', loginIntro: '输入本机 AgentsView 的访问令牌。令牌只用于换取安全会话，AgentsView 不会将它写入浏览器存储。',
+        accessToken: '访问令牌', tokenPlaceholder: '粘贴访问令牌', connect: '安全连接',
+        loginSecurity: '会话使用 HttpOnly Cookie；访问令牌不会写入 localStorage 或 URL。',
+        loginBadToken: '访问令牌无效，请检查后重试。', sessionExpired: '安全会话已过期，请重新输入访问令牌。',
+        loginUnavailable: '无法连接本机 Bridge，请确认 AgentsView 正在运行。',
+        bridgeConnected: '已连接本机 Bridge · 状态流 · 受限决策通道',
+        demoConnected: '已连接 Demo Bridge · 操作将经过完整审批管线',
+        bridgeConnecting: '正在连接本机 Bridge…', bridgeOffline: '连接已中断，正在自动重连…', offline: '离线',
+        noTasks: '这个星区暂时没有任务', noTaskSelected: '选择一颗任务星查看详情',
+        highRisk: '高风险 · 敏感写入', approvalQueue: '待处理请求', requestType: '请求类型',
+        requestCommand: '命令执行', requestFile: '文件变更', requestTool: '工具调用',
+        requestedAt: '请求时间', expiresAt: '过期时间', approvalSubmitting: '决策正在安全回传，请勿重复操作。',
+        approvalUnavailable: '审批请求已不再可处理，请刷新状态。',
+        decisionConflict: '该请求已被其他客户端处理，状态已刷新。',
+        decisionExpired: '该审批已过期或被取消，状态已刷新。',
+        decisionFailed: '决策回传失败，请稍后重试。', decisionAlreadyHandled: '服务器确认：相同决策已处理。',
+        loggedOut: '已退出安全会话。', allowedToast: '已允许本次请求', deniedToast: '已拒绝本次请求',
+        cost: '估算费用', tokens: 'Tokens', outcome: '结果状态', success: '成功', failed: '失败',
+        cancelled: '已取消', interrupted: '已中断', noActivity: '暂时没有活动记录',
+        adapterDemo: '演示', adapterReady: '就绪', adapterOff: '未启用', filesChangedUnknown: '—',
+        live: '实时', localBridge: '本机 BRIDGE · 状态流 · 受限决策通道'
+      });
+      Object.assign(translations.en, {
+        logout: 'Sign out', logoutAria: 'Sign out of AgentsView', connecting: 'CONNECTING',
+        loginTitle: 'Connect your agent constellation', loginIntro: 'Enter the access token for your local AgentsView. It is exchanged for a secure session and AgentsView never persists it in browser storage.',
+        accessToken: 'Access token', tokenPlaceholder: 'Paste access token', connect: 'Connect securely',
+        loginSecurity: 'The session uses an HttpOnly cookie. The access token is never written to localStorage or the URL.',
+        loginBadToken: 'That access token is invalid. Check it and try again.', sessionExpired: 'Your secure session expired. Enter the access token again.',
+        loginUnavailable: 'Cannot reach the local Bridge. Make sure AgentsView is running.',
+        bridgeConnected: 'LOCAL BRIDGE CONNECTED · STATE STREAM · RESTRICTED DECISIONS',
+        demoConnected: 'DEMO BRIDGE CONNECTED · ACTIONS USE THE FULL APPROVAL PIPELINE',
+        bridgeConnecting: 'Connecting to the local Bridge…', bridgeOffline: 'Connection lost. Reconnecting automatically…', offline: 'OFFLINE',
+        noTasks: 'No tasks in this sector right now', noTaskSelected: 'Select a task star to inspect it',
+        highRisk: 'High risk · sensitive write', approvalQueue: 'PENDING REQUESTS', requestType: 'Request type',
+        requestCommand: 'Command execution', requestFile: 'File change', requestTool: 'Tool call',
+        requestedAt: 'Requested', expiresAt: 'Expires', approvalSubmitting: 'Decision is being delivered securely. Please do not repeat it.',
+        approvalUnavailable: 'This approval can no longer be handled. Refreshing state.',
+        decisionConflict: 'Another client already handled this request. State has been refreshed.',
+        decisionExpired: 'This approval expired or was cancelled. State has been refreshed.',
+        decisionFailed: 'Could not deliver the decision. Try again shortly.', decisionAlreadyHandled: 'Server confirmed: the same decision was already handled.',
+        loggedOut: 'Secure session ended.', allowedToast: 'Request allowed once', deniedToast: 'Request denied',
+        cost: 'Est. cost', tokens: 'Tokens', outcome: 'Outcome', success: 'Success', failed: 'Failed',
+        cancelled: 'Cancelled', interrupted: 'Interrupted', noActivity: 'No activity has been reported yet',
+        adapterDemo: 'Demo', adapterReady: 'Ready', adapterOff: 'Off', filesChangedUnknown: '—',
+        live: 'LIVE', localBridge: 'LOCAL BRIDGE · STATE STREAM · RESTRICTED DECISIONS'
+      });
+
+      let tasks = [];
+      let approvals = [];
+      let capabilities = { demo: false, codex: false, claude: false, claudeHooks: false };
+      let serverId = null;
+      let sequence = 0;
+      const mapCard = document.querySelector('#mapCard');
+      const taskNodes = document.querySelector('#taskNodes');
+      const taskRoutes = document.querySelector('#taskRoutes');
+      const emptyMap = document.querySelector('#emptyMap');
+      const overviewPanel = document.querySelector('#overviewPanel');
+      const taskPanel = document.querySelector('#taskPanel');
+      const breadcrumb = document.querySelector('#breadcrumb');
+      const mapTitle = document.querySelector('#mapTitle');
+      const mapBack = document.querySelector('#mapBack');
+      const syncTime = document.querySelector('#syncTime');
+      const scopeDialog = document.querySelector('#scopeDialog');
+      const confirmDialog = document.querySelector('#confirmDialog');
+      const confirmCommand = document.querySelector('#confirmCommand');
+      const confirmAllow = document.querySelector('#confirmAllow');
+      const toast = document.querySelector('#toast');
+      const toastText = document.querySelector('#toastText');
+      const inspector = document.querySelector('#inspector');
+      const loginGate = document.querySelector('#loginGate');
+      const loginForm = document.querySelector('#loginForm');
+      const loginSubmit = document.querySelector('#loginSubmit');
+      const accessToken = document.querySelector('#accessToken');
+      const loginError = document.querySelector('#loginError');
+      const connectionStrip = document.querySelector('#connectionStrip');
+      const connectionText = document.querySelector('#connectionText');
+      const livePill = document.querySelector('#livePill');
+      const liveText = document.querySelector('#liveText');
+      const appShell = document.querySelector('.app-shell');
+      const codexAdapter = document.querySelector('#codexAdapter');
+      const claudeAdapter = document.querySelector('#claudeAdapter');
+
+      let lang = 'zh';
+      let activeStatus = 'root';
+      let activeTaskId = null;
+      let activeApprovalId = null;
+      let pendingConfirmApprovalId = null;
+      let lastSyncSeconds = 0;
+      let connectionState = 'connecting';
+      let authenticated = false;
+      let socket = null;
+      let reconnectTimer = null;
+      let reconnectDelay = 800;
+      let bootstrapPromise = null;
+      let toastTimer = null;
+      const pendingDecisions = new Set();
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+
+      const t = (key) => translations[lang][key] || key;
+
+      function localized(value) {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          if (typeof value[lang] === 'string') return value[lang];
+          if (typeof value.zh === 'string') return value.zh;
+          if (typeof value.en === 'string') return value.en;
+        }
+        if (value === null || value === undefined) return '';
+        return String(value);
+      }
+
+      function textNode(tag, className, value) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (value !== undefined && value !== null) element.textContent = String(value);
+        return element;
+      }
+
+      function svgNode(tag, attributes) {
+        const element = document.createElementNS(SVG_NS, tag);
+        Object.entries(attributes || {}).forEach(([name, value]) => element.setAttribute(name, String(value)));
+        return element;
+      }
+
+      function createStatusIcon(status) {
+        const svg = svgNode('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+        if (status === 'running') {
+          svg.append(svgNode('path', { d: 'M4 12h4l2-6 4 12 2-6h4' }));
+        } else if (status === 'approval') {
+          svg.append(
+            svgNode('path', { d: 'M12 7v6m0 4h.01' }),
+            svgNode('circle', { cx: '12', cy: '12', r: '8' })
+          );
+        } else {
+          svg.append(
+            svgNode('path', { d: 'm7 12 3 3 7-7' }),
+            svgNode('circle', { cx: '12', cy: '12', r: '8' })
+          );
+        }
+        return svg;
+      }
+
+      function uiStatus(task) {
+        if (task && task.status === 'waiting_approval') return 'approval';
+        if (task && task.status === 'completed') return 'completed';
+        return 'running';
+      }
+
+      function statusText(status) {
+        return t(status);
+      }
+
+      function taskTitle(task) {
+        return localized(task.title) || String(task.id || '');
+      }
+
+      function taskSummary(task) {
+        return localized(task.summary) || t('noActivity');
+      }
+
+      function taskAgent(task) {
+        if (task.agent === 'claude') return 'Claude Code';
+        if (task.agent === 'codex') return 'Codex';
+        return 'Demo';
+      }
+
+      function projectName(task) {
+        if (!task.cwd) return taskAgent(task);
+        const chunks = String(task.cwd).split(/[\\/]+/).filter(Boolean);
+        return chunks[chunks.length - 1] || String(task.cwd);
+      }
+
+      function parseTime(value) {
+        const valueOf = value ? Date.parse(value) : NaN;
+        return Number.isFinite(valueOf) ? valueOf : null;
+      }
+
+      function formatDuration(task) {
+        const start = parseTime(task.startedAt);
+        if (!start) return '—';
+        const finish = parseTime(task.completedAt) || Date.now();
+        const total = Math.max(0, Math.floor((finish - start) / 1000));
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const seconds = total % 60;
+        const pad = (number) => String(number).padStart(2, '0');
+        return hours > 0 ? pad(hours) + ':' + pad(minutes) + ':' + pad(seconds) : pad(minutes) + ':' + pad(seconds);
+      }
+
+      function secondsSince(value) {
+        const at = parseTime(value);
+        return at ? Math.max(0, Math.floor((Date.now() - at) / 1000)) : 0;
+      }
+
+      function formatDateTime(value) {
+        const at = parseTime(value);
+        if (!at) return '—';
+        try {
+          return new Intl.DateTimeFormat(lang === 'zh' ? 'zh-CN' : 'en', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          }).format(new Date(at));
+        } catch (_) {
+          return new Date(at).toLocaleString();
+        }
+      }
+
+      function formatTokens(task) {
+        if (!task.tokens || !Number.isFinite(Number(task.tokens.total))) return '—';
+        return Number(task.tokens.total).toLocaleString();
+      }
+
+      function formatCost(task) {
+        if (!Number.isFinite(Number(task.costUsd))) return '—';
+        return '$' + Number(task.costUsd).toFixed(4);
+      }
+
+      function taskActivity(task) {
+        return Array.isArray(task.activity) ? task.activity.slice().sort((a, b) => {
+          return (parseTime(b && b.at) || 0) - (parseTime(a && a.at) || 0);
+        }) : [];
+      }
+
+      function activityText(activity) {
+        if (!activity) return t('noActivity');
+        const label = localized(activity.label);
+        const detail = localized(activity.detail);
+        return detail ? label + ' · ' + detail : label || t('noActivity');
+      }
+
+      function pendingApprovalsFor(taskId) {
+        return approvals.filter((approval) => {
+          return approval.taskId === taskId && (approval.state === 'pending' || approval.state === 'submitting');
+        }).sort((a, b) => (parseTime(a.requestedAt) || 0) - (parseTime(b.requestedAt) || 0));
+      }
+
+      function approvalKind(approval) {
+        if (approval.kind === 'file_change') return t('requestFile');
+        if (approval.kind === 'tool') return t('requestTool');
+        return t('requestCommand');
+      }
+
+      function approvalActionText(approval) {
+        const details = approval && approval.details;
+        if (details && typeof details === 'object') {
+          const candidates = [details.command, details.commands, details.path, details.tool, details.toolName, details.input];
+          for (const candidate of candidates) {
+            if (typeof candidate === 'string' && candidate) return candidate;
+            if (Array.isArray(candidate) && candidate.length) return candidate.map(String).join(' ');
+          }
+          try {
+            const serialized = JSON.stringify(details, null, 2);
+            return serialized.length > 2400 ? serialized.slice(0, 2400) + '\n…' : serialized;
+          } catch (_) {}
+        }
+        return localized(approval && approval.summary)
+          || (typeof details === 'string' ? details : '')
+          || localized(approval && approval.title)
+          || approvalKind(approval || {});
+      }
+
+      function approvalReasonText(approval) {
+        const details = approval && approval.details;
+        if (typeof details === 'string' && details) return details;
+        if (details && typeof details === 'object') {
+          const candidates = [details.reason, details.message, details.description];
+          const match = candidates.find((value) => typeof value === 'string' && value);
+          if (match) return match;
+        }
+        return localized(approval && approval.summary)
+          || localized(approval && approval.title)
+          || approvalKind(approval || {});
+      }
+
+      function normalizeTask(raw) {
+        if (!raw || typeof raw !== 'object' || raw.id === undefined || raw.id === null) return null;
+        const status = ['running', 'waiting_approval', 'completed'].includes(raw.status) ? raw.status : 'running';
+        const agent = ['codex', 'claude', 'demo'].includes(raw.agent) ? raw.agent : 'demo';
+        return Object.assign({}, raw, { id: String(raw.id), status, agent });
+      }
+
+      function normalizeApproval(raw) {
+        if (!raw || typeof raw !== 'object' || raw.id === undefined || raw.taskId === undefined) return null;
+        return Object.assign({}, raw, {
+          id: String(raw.id),
+          taskId: String(raw.taskId),
+          state: String(raw.state || 'pending'),
+          risk: ['low', 'medium', 'high'].includes(raw.risk) ? raw.risk : 'low'
+        });
+      }
+
+      function updateStaticLanguage() {
+        document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+        document.title = lang === 'zh' ? 'AgentsView · Agent 任务控制台' : 'AgentsView · Agent Operations Console';
+        document.querySelectorAll('[data-i18n]').forEach((element) => {
+          element.textContent = t(element.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-aria]').forEach((element) => {
+          element.setAttribute('aria-label', t(element.dataset.i18nAria));
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
+          element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder));
+        });
+        document.querySelectorAll('[data-lang]').forEach((button) => {
+          const active = button.dataset.lang === lang;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+        if (loginError.dataset.i18nKey) loginError.textContent = t(loginError.dataset.i18nKey);
+        setConnectionState(connectionState);
+        renderAll();
+        updateSyncText();
+      }
+
+      function counts() {
+        const result = { running: 0, approval: 0, completed: 0 };
+        tasks.forEach((task) => { result[uiStatus(task)] += 1; });
+        return result;
+      }
+
+      function updateCounts() {
+        const current = counts();
+        document.querySelectorAll('[data-count]').forEach((element) => {
+          element.textContent = String(current[element.dataset.count] || 0);
+        });
+      }
+
+      function refreshMapHeader() {
+        const keys = activeStatus === 'root'
+          ? ['overviewCrumb', 'overviewTitle']
+          : [activeStatus + 'Crumb', activeStatus + 'Title'];
+        breadcrumb.textContent = t(keys[0]);
+        mapTitle.textContent = t(keys[1]);
+      }
+
+      function nodePositions(count) {
+        const layouts = {
+          0: [],
+          1: [[50, 50]],
+          2: [[33, 52], [67, 52]],
+          3: [[50, 24], [28, 69], [72, 69]],
+          4: [[50, 18], [24, 52], [50, 82], [76, 52]],
+          5: [[50, 16], [22, 42], [32, 77], [68, 77], [78, 42]],
+          6: [[50, 15], [23, 35], [23, 69], [50, 84], [77, 69], [77, 35]]
+        };
+        if (layouts[count]) return layouts[count];
+        return Array.from({ length: count }, (_, index) => {
+          const angle = -Math.PI / 2 + (Math.PI * 2 * index / count);
+          return [50 + Math.cos(angle) * 31, 50 + Math.sin(angle) * 34];
+        });
+      }
+
+      function renderRoutes(positions, status) {
+        taskRoutes.replaceChildren();
+        if (!positions.length) return;
+        const routeClass = status === 'approval' ? 'route-amber' : status === 'completed' ? 'route-green' : 'route-cyan';
+        const color = status === 'approval' ? '255,195,92' : status === 'completed' ? '85,230,165' : '88,213,255';
+        const points = positions.map(([x, y]) => [x * 10, y * 7]);
+        if (points.length > 1) {
+          let d = '';
+          points.forEach(([x, y], index) => { d += (index ? ' L' : 'M') + x + ' ' + y; });
+          if (points.length > 2) d += ' Z';
+          taskRoutes.append(svgNode('path', { class: 'route ' + routeClass, d }));
+        }
+        if (points.length > 2) {
+          points.forEach(([x, y]) => {
+            taskRoutes.append(svgNode('path', { class: 'route ' + routeClass, d: 'M500 350 L' + x + ' ' + y }));
+          });
+        }
+        taskRoutes.append(svgNode('circle', {
+          cx: '500', cy: '350', r: '155', fill: 'none', stroke: 'rgba(' + color + ',.07)',
+          'stroke-width': '1', 'stroke-dasharray': '4 12'
+        }));
+      }
+
+      function renderTaskNodes() {
+        const matching = activeStatus === 'root' ? [] : tasks.filter((task) => uiStatus(task) === activeStatus);
+        const visible = matching.slice(0, 8);
+        const activeTask = matching.find((task) => task.id === activeTaskId);
+        if (activeTask && !visible.some((task) => task.id === activeTask.id)) visible[visible.length - 1] = activeTask;
+        const positions = nodePositions(visible.length);
+        renderRoutes(positions, activeStatus);
+        taskNodes.replaceChildren();
+        emptyMap.hidden = activeStatus === 'root' || visible.length > 0;
+        emptyMap.textContent = t('noTasks');
+
+        visible.forEach((task, index) => {
+          const status = uiStatus(task);
+          const button = textNode('button', 'task-node' + (task.id === activeTaskId ? ' selected' : ''));
+          button.type = 'button';
+          button.dataset.taskId = task.id;
+          button.dataset.status = status;
+          button.style.left = String(positions[index] ? positions[index][0] : 50) + '%';
+          button.style.top = String(positions[index] ? positions[index][1] : 50) + '%';
+          button.setAttribute('aria-label', taskTitle(task) + ', ' + statusText(status));
+
+          const state = textNode('span', 'task-state');
+          state.append(textNode('i'), document.createTextNode(statusText(status)));
+          const core = textNode('span', 'task-core');
+          core.append(createStatusIcon(status));
+          const title = textNode('span', 'task-title', taskTitle(task));
+          const meta = textNode('span', 'task-meta', taskAgent(task) + ' · ' + formatDuration(task));
+          button.append(state, core, title, meta);
+          button.addEventListener('click', () => selectTask(task.id, true));
+          taskNodes.append(button);
+        });
+      }
+
+      function makeMetaCard(label, value) {
+        const card = textNode('div', 'meta-card');
+        card.append(textNode('span', '', label), textNode('strong', '', value));
+        return card;
+      }
+
+      function appendPanelHeader(task, statusClass) {
+        const row = textNode('div', 'detail-state');
+        const badge = textNode('span', 'status-label ' + (statusClass || ''));
+        badge.append(textNode('i'), document.createTextNode(statusText(uiStatus(task))));
+        row.append(badge, textNode('span', 'source-label', taskAgent(task)));
+        const title = textNode('h2', '', taskTitle(task));
+        const summary = textNode('p', 'task-summary', taskSummary(task));
+        const meta = textNode('div', 'meta-grid');
+        meta.append(
+          makeMetaCard(t('project'), projectName(task)),
+          makeMetaCard(t('elapsed'), formatDuration(task))
+        );
+        taskPanel.append(row, title, summary, meta);
+      }
+
+      function makeSection(label, rightText) {
+        const section = textNode('section', 'detail-section');
+        const header = textNode('div', 'section-label');
+        header.append(textNode('span', '', label));
+        if (rightText !== undefined && rightText !== null) header.append(textNode('span', '', rightText));
+        section.append(header);
+        return section;
+      }
+
+      function appendUsage(task) {
+        const hasTokens = task.tokens && Number.isFinite(Number(task.tokens.total));
+        const hasCost = Number.isFinite(Number(task.costUsd));
+        if (!hasTokens && !hasCost) return;
+        const meta = textNode('div', 'meta-grid');
+        if (hasTokens) meta.append(makeMetaCard(t('tokens'), formatTokens(task)));
+        if (hasCost) meta.append(makeMetaCard(t('cost'), formatCost(task)));
+        taskPanel.append(meta);
+      }
+
+      function renderRunningPanel(task) {
+        appendPanelHeader(task, '');
+        const activity = taskActivity(task);
+        const latest = activity[0];
+
+        const current = makeSection(t('currentAction'), latest ? secondsSince(latest.at) + t('secondsAgo') : '');
+        current.append(textNode('div', 'code-block', latest ? activityText(latest) : taskSummary(task)));
+        taskPanel.append(current);
+
+        const recent = makeSection(t('recentEvents'), String(activity.length));
+        const block = textNode('div', 'activity-block');
+        if (!activity.length) {
+          block.textContent = t('noActivity');
+        } else {
+          activity.slice(0, 6).forEach((item) => {
+            const line = textNode('div', 'activity-line');
+            line.append(
+              textNode('i'),
+              textNode('span', '', activityText(item)),
+              textNode('time', '', formatDateTime(item.at))
+            );
+            block.append(line);
+          });
+        }
+        recent.append(block);
+        taskPanel.append(recent);
+        appendUsage(task);
+      }
+
+      function renderApprovalQueue(items, selectedId) {
+        if (items.length < 2) return;
+        const label = textNode('div', 'section-label');
+        label.style.marginTop = '16px';
+        label.append(textNode('span', '', t('approvalQueue')), textNode('span', '', String(items.length)));
+        const queue = textNode('div', 'approval-queue');
+        items.forEach((item, index) => {
+          const chip = textNode('button', 'approval-chip' + (item.id === selectedId ? ' active' : ''), '#' + (index + 1) + ' · ' + (localized(item.title) || approvalKind(item)));
+          chip.type = 'button';
+          chip.addEventListener('click', () => {
+            activeApprovalId = item.id;
+            renderInspector();
+          });
+          queue.append(chip);
+        });
+        taskPanel.append(label, queue);
+      }
+
+      function renderApprovalPanel(task) {
+        appendPanelHeader(task, 'approval');
+        const items = pendingApprovalsFor(task.id);
+        if (!items.some((item) => item.id === activeApprovalId)) activeApprovalId = items[0] ? items[0].id : null;
+        renderApprovalQueue(items, activeApprovalId);
+        const approval = items.find((item) => item.id === activeApprovalId) || items[0];
+
+        if (!approval) {
+          const unavailable = textNode('div', 'approval-state-note', t('approvalUnavailable'));
+          taskPanel.append(unavailable);
+          return;
+        }
+
+        const riskKey = approval.risk === 'high' ? 'highRisk' : approval.risk === 'medium' ? 'mediumRisk' : 'lowRisk';
+        const action = makeSection(t('risk'));
+        const actionHeader = action.querySelector('.section-label');
+        const risk = textNode('span', 'risk-label ' + (approval.risk === 'high' ? 'high' : approval.risk === 'medium' ? 'medium' : ''), t(riskKey));
+        actionHeader.append(risk);
+        action.append(textNode('div', 'code-block', approvalActionText(approval)));
+        taskPanel.append(action);
+
+        if (task.cwd) {
+          const cwdSection = makeSection(t('workingDirectory'));
+          cwdSection.append(textNode('div', 'activity-block', String(task.cwd)));
+          taskPanel.append(cwdSection);
+        }
+
+        const reasonSection = makeSection(t('approvalReason'));
+        const reason = textNode('div', 'reason-card');
+        const warning = svgNode('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+        warning.append(svgNode('path', { d: 'M12 3 3.5 19h17zM12 8v5m0 3h.01' }));
+        reason.append(warning, textNode('span', '', approvalReasonText(approval)));
+        reasonSection.append(reason);
+        taskPanel.append(reasonSection);
+
+        const requestMeta = textNode('div', 'meta-grid');
+        requestMeta.append(
+          makeMetaCard(t('requestType'), approvalKind(approval)),
+          makeMetaCard(t('requestedAt'), formatDateTime(approval.requestedAt))
+        );
+        if (approval.expiresAt) requestMeta.append(makeMetaCard(t('expiresAt'), formatDateTime(approval.expiresAt)));
+        taskPanel.append(requestMeta);
+
+        const submitting = pendingDecisions.has(approval.id) || approval.state === 'submitting';
+        const actions = textNode('div', 'approval-actions');
+        const allow = textNode('button', 'primary-action', submitting ? t('decisionPending') : t('allowOnce'));
+        const deny = textNode('button', 'deny-action', submitting ? t('decisionPending') : t('deny'));
+        allow.type = 'button';
+        deny.type = 'button';
+        allow.disabled = submitting;
+        deny.disabled = submitting;
+        allow.addEventListener('click', () => requestApprovalDecision(approval, 'allow'));
+        deny.addEventListener('click', () => requestApprovalDecision(approval, 'deny'));
+        actions.append(allow, deny);
+        taskPanel.append(actions, textNode('p', 'action-note', t('allowNote')));
+        if (submitting) taskPanel.append(textNode('div', 'approval-state-note', t('approvalSubmitting')));
+      }
+
+      function outcomeLabel(task) {
+        if (task.outcome && translations[lang][task.outcome]) return t(task.outcome);
+        return task.outcome ? String(task.outcome) : t('success');
+      }
+
+      function renderCompletedPanel(task) {
+        appendPanelHeader(task, 'completed');
+        const result = makeSection(t('result'));
+        result.append(textNode('div', 'result-block', localized(task.result) || taskSummary(task)));
+        taskPanel.append(result);
+
+        const meta = textNode('div', 'meta-grid');
+        meta.append(
+          makeMetaCard(t('outcome'), outcomeLabel(task)),
+          makeMetaCard(t('duration'), formatDuration(task))
+        );
+        if (task.tokens && Number.isFinite(Number(task.tokens.total))) meta.append(makeMetaCard(t('tokens'), formatTokens(task)));
+        if (Number.isFinite(Number(task.costUsd))) meta.append(makeMetaCard(t('cost'), formatCost(task)));
+        taskPanel.append(meta);
+
+        const boundary = textNode('div', 'boundary-note');
+        boundary.append(textNode('strong', '', 'READ ONLY'), textNode('span', '', t('viewOnly')));
+        taskPanel.append(boundary);
+      }
+
+      function renderInspector() {
+        if (activeStatus === 'root') {
+          overviewPanel.hidden = false;
+          taskPanel.classList.remove('active');
+          taskPanel.replaceChildren();
+          return;
+        }
+
+        overviewPanel.hidden = true;
+        taskPanel.replaceChildren();
+        const task = tasks.find((item) => item.id === activeTaskId && uiStatus(item) === activeStatus);
+        if (!task) {
+          taskPanel.append(textNode('div', 'boundary-note', t('noTaskSelected')));
+          taskPanel.classList.add('active');
+          return;
+        }
+
+        if (activeStatus === 'running') renderRunningPanel(task);
+        else if (activeStatus === 'approval') renderApprovalPanel(task);
+        else renderCompletedPanel(task);
+        taskPanel.classList.add('active');
+      }
+
+      function updateAdapters() {
+        codexAdapter.dataset.enabled = capabilities.codex ? 'true' : 'false';
+        claudeAdapter.dataset.enabled = capabilities.claude ? 'true' : 'false';
+        codexAdapter.title = capabilities.codex ? t('adapterReady') : t('adapterOff');
+        claudeAdapter.title = capabilities.claude ? t('adapterReady') : t('adapterOff');
+      }
+
+      function renderAll() {
+        updateCounts();
+        refreshMapHeader();
+        renderTaskNodes();
+        renderInspector();
+        updateAdapters();
+      }
+
+      function reconcileView() {
+        if (activeStatus === 'root') {
+          activeTaskId = null;
+          activeApprovalId = null;
+        } else {
+          const matching = tasks.filter((task) => uiStatus(task) === activeStatus);
+          if (!matching.some((task) => task.id === activeTaskId)) {
+            activeTaskId = matching[0] ? matching[0].id : null;
+            activeApprovalId = null;
+          }
+        }
+        renderAll();
+      }
+
+      function openStatus(status, push) {
+        if (!['running', 'approval', 'completed'].includes(status)) return;
+        activeStatus = status;
+        const matching = tasks.filter((task) => uiStatus(task) === status);
+        if (!matching.some((task) => task.id === activeTaskId)) activeTaskId = matching[0] ? matching[0].id : null;
+        activeApprovalId = null;
+        mapCard.dataset.view = 'detail';
+        mapCard.dataset.filter = status;
+        renderAll();
+        if (push !== false) updateHash();
+        if (authenticated && activeTaskId) {
+          requestAnimationFrame(() => {
+            const selected = Array.from(taskNodes.querySelectorAll('[data-task-id]')).find((item) => item.dataset.taskId === activeTaskId);
+            if (selected) selected.focus({ preventScroll: true });
+          });
+        }
+      }
+
+      function showOverview(push) {
+        activeStatus = 'root';
+        activeTaskId = null;
+        activeApprovalId = null;
+        mapCard.dataset.view = 'root';
+        mapCard.dataset.filter = 'root';
+        renderAll();
+        if (push !== false) updateHash();
+        if (authenticated) {
+          const first = document.querySelector('.category-node[data-status="running"]');
+          if (first) first.focus({ preventScroll: true });
+        }
+      }
+
+      function selectTask(taskId, push) {
+        const task = tasks.find((item) => item.id === taskId && uiStatus(item) === activeStatus);
+        if (!task) return;
+        activeTaskId = task.id;
+        activeApprovalId = null;
+        renderTaskNodes();
+        renderInspector();
+        if (push !== false) updateHash();
+        if (matchMedia('(max-width: 820px)').matches) {
+          requestAnimationFrame(() => inspector.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }
+      }
+
+      function updateHash() {
+        const next = activeStatus === 'root'
+          ? '#overview'
+          : '#' + activeStatus + '/' + encodeURIComponent(activeTaskId || '');
+        if (location.hash !== next) history.pushState(null, '', next);
+      }
+
+      function syncFromHash() {
+        const parts = location.hash.replace('#', '').split('/');
+        const status = parts[0];
+        let taskId = '';
+        try { taskId = decodeURIComponent(parts.slice(1).join('/')); } catch (_) {}
+        if (['running', 'approval', 'completed'].includes(status)) {
+          openStatus(status, false);
+          if (taskId) selectTask(taskId, false);
+        } else {
+          showOverview(false);
+        }
+      }
+
+      function setConnectionState(next) {
+        connectionState = next;
+        connectionStrip.dataset.state = next;
+        livePill.dataset.state = next;
+        const hasRealAdapter = capabilities.codex || capabilities.claude || capabilities.claudeHooks;
+        const key = next === 'connected'
+          ? (capabilities.demo && !hasRealAdapter ? 'demoConnected' : 'bridgeConnected')
+          : next === 'offline' ? 'bridgeOffline' : 'bridgeConnecting';
+        connectionText.textContent = t(key);
+        liveText.textContent = next === 'connected' ? t('live') : next === 'offline' ? t('offline') : t('connecting');
+      }
+
+      function updateSyncText() {
+        syncTime.textContent = lastSyncSeconds < 3 ? t('justNow') : String(lastSyncSeconds) + t('secondsAgo');
+      }
+
+      function showToast(message, isError) {
+        toastText.textContent = String(message || '');
+        toast.classList.toggle('error', Boolean(isError));
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+      }
+
+      function setLoginError(key, fallback) {
+        loginError.dataset.i18nKey = key || '';
+        loginError.textContent = key ? t(key) : String(fallback || '');
+      }
+
+      function showLogin(errorKey) {
+        authenticated = false;
+        loginGate.hidden = false;
+        appShell.inert = true;
+        if (errorKey) setLoginError(errorKey);
+        requestAnimationFrame(() => accessToken.focus({ preventScroll: true }));
+      }
+
+      function hideLogin() {
+        loginGate.hidden = true;
+        appShell.inert = false;
+        setLoginError('');
+      }
+
+      function handleUnauthorized() {
+        if (socket) {
+          const activeSocket = socket;
+          socket = null;
+          try { activeSocket.close(4001, 'session expired'); } catch (_) {}
+        }
+        clearTimeout(reconnectTimer);
+        showLogin('sessionExpired');
+      }
+
+      async function apiFetch(path, options, handleAuth) {
+        const response = await fetch(path, Object.assign({
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' }
+        }, options || {}));
+        if (response.status === 401 && handleAuth !== false) handleUnauthorized();
+        return response;
+      }
+
+      async function responseJson(response) {
+        try { return await response.json(); } catch (_) { return null; }
+      }
+
+      function applySnapshot(snapshot, envelope) {
+        tasks = Array.isArray(snapshot.tasks) ? snapshot.tasks.map(normalizeTask).filter(Boolean) : [];
+        approvals = Array.isArray(snapshot.approvals) ? snapshot.approvals.map(normalizeApproval).filter(Boolean) : [];
+        if (snapshot.capabilities && typeof snapshot.capabilities === 'object') {
+          capabilities = {
+            demo: Boolean(snapshot.capabilities.demo),
+            codex: Boolean(snapshot.capabilities.codex),
+            claude: Boolean(snapshot.capabilities.claude),
+            claudeHooks: Boolean(snapshot.capabilities.claudeHooks)
+          };
+        }
+        if (snapshot.serverId) serverId = String(snapshot.serverId);
+        if (Number.isFinite(Number(snapshot.sequence))) sequence = Number(snapshot.sequence);
+        if (envelope && envelope.serverId) serverId = String(envelope.serverId);
+        if (envelope && Number.isFinite(Number(envelope.sequence))) sequence = Number(envelope.sequence);
+        lastSyncSeconds = 0;
+        setConnectionState('connected');
+        reconcileView();
+        updateSyncText();
+      }
+
+      async function refreshBootstrap() {
+        if (bootstrapPromise) return bootstrapPromise;
+        bootstrapPromise = (async () => {
+          try {
+            const wasAuthenticated = authenticated;
+            const response = await apiFetch('/api/bootstrap', undefined, false);
+            if (response.status === 401) {
+              if (wasAuthenticated) handleUnauthorized();
+              else showLogin();
+              setConnectionState('connecting');
+              return false;
+            }
+            if (!response.ok) throw new Error('bootstrap ' + response.status);
+            const snapshot = await responseJson(response);
+            if (!snapshot || typeof snapshot !== 'object') throw new Error('invalid bootstrap');
+            authenticated = true;
+            hideLogin();
+            applySnapshot(snapshot);
+            connectSocket();
+            return true;
+          } catch (error) {
+            if (!authenticated) showLogin('loginUnavailable');
+            setConnectionState('offline');
+            return false;
+          } finally {
+            bootstrapPromise = null;
+          }
+        })();
+        return bootstrapPromise;
+      }
+
+      function scheduleReconnect() {
+        if (!authenticated || reconnectTimer) return;
+        const jitter = Math.floor(Math.random() * 240);
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connectSocket();
+        }, reconnectDelay + jitter);
+        reconnectDelay = Math.min(10000, Math.round(reconnectDelay * 1.65));
+      }
+
+      function connectSocket() {
+        if (!authenticated || socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        setConnectionState('connecting');
+        const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const nextSocket = new WebSocket(scheme + '//' + location.host + '/ws');
+        socket = nextSocket;
+
+        nextSocket.addEventListener('open', () => {
+          if (socket !== nextSocket) return;
+          reconnectDelay = 800;
+          setConnectionState('connected');
+          refreshBootstrap();
+        });
+
+        nextSocket.addEventListener('message', (message) => {
+          if (socket !== nextSocket) return;
+          let event;
+          try { event = JSON.parse(message.data); } catch (_) { return; }
+          if (!event || typeof event !== 'object') return;
+          if (event.type === 'hello') {
+            refreshBootstrap();
+            return;
+          }
+
+          const incomingServerId = event.serverId ? String(event.serverId) : null;
+          const incomingSequence = Number(event.sequence);
+          if (serverId && incomingServerId && incomingServerId !== serverId) {
+            refreshBootstrap();
+            return;
+          }
+          if (Number.isFinite(incomingSequence) && sequence > 0 && incomingSequence > sequence + 1) {
+            refreshBootstrap();
+            return;
+          }
+          if (Number.isFinite(incomingSequence) && incomingSequence <= sequence) return;
+
+          if ((event.type === 'snapshot' || event.type === 'state.changed') && event.payload && typeof event.payload === 'object') {
+            applySnapshot(event.payload, event);
+          } else if (Number.isFinite(incomingSequence)) {
+            sequence = incomingSequence;
+          }
+        });
+
+        nextSocket.addEventListener('close', (event) => {
+          if (socket !== nextSocket) return;
+          socket = null;
+          if (event.code === 4401 || event.code === 4001) {
+            handleUnauthorized();
+            return;
+          }
+          setConnectionState('offline');
+          refreshBootstrap();
+          scheduleReconnect();
+        });
+
+        nextSocket.addEventListener('error', () => {
+          if (socket === nextSocket) setConnectionState('offline');
+        });
+      }
+
+      function mergeById(collection, value) {
+        if (!value || value.id === undefined) return collection;
+        const normalizedId = String(value.id);
+        const index = collection.findIndex((item) => item.id === normalizedId);
+        if (index < 0) return collection.concat(value);
+        const result = collection.slice();
+        result[index] = value;
+        return result;
+      }
+
+      function requestApprovalDecision(approval, decision) {
+        if (!approval || pendingDecisions.has(approval.id)) return;
+        if (decision === 'allow' && (approval.risk === 'medium' || approval.risk === 'high')) {
+          pendingConfirmApprovalId = approval.id;
+          confirmCommand.textContent = approvalActionText(approval);
+          confirmDialog.showModal();
+          return;
+        }
+        submitApprovalDecision(approval.id, decision);
+      }
+
+      async function submitApprovalDecision(approvalId, decision) {
+        const approval = approvals.find((item) => item.id === approvalId);
+        if (!approval || pendingDecisions.has(approvalId)) return;
+        pendingDecisions.add(approvalId);
+        renderInspector();
+
+        try {
+          const response = await apiFetch('/api/approvals/' + encodeURIComponent(approvalId) + '/decision', {
+            method: 'PUT',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ decision })
+          });
+          const payload = await responseJson(response);
+
+          if (response.status === 409) {
+            showToast(t('decisionConflict'), true);
+            await refreshBootstrap();
+            return;
+          }
+          if (response.status === 410) {
+            showToast(t('decisionExpired'), true);
+            await refreshBootstrap();
+            return;
+          }
+          if (!response.ok) {
+            const serverMessage = payload && payload.error && payload.error.message;
+            showToast(serverMessage || t('decisionFailed'), true);
+            if (response.status === 404) await refreshBootstrap();
+            return;
+          }
+
+          if (payload && payload.approval) {
+            const normalizedApproval = normalizeApproval(payload.approval);
+            if (normalizedApproval) approvals = mergeById(approvals, normalizedApproval);
+          }
+          let nextTask = null;
+          if (payload && payload.task) {
+            nextTask = normalizeTask(payload.task);
+            if (nextTask) tasks = mergeById(tasks, nextTask);
+          }
+          lastSyncSeconds = 0;
+
+          if (payload && payload.idempotent) {
+            showToast(t('decisionAlreadyHandled'));
+          } else {
+            showToast(decision === 'allow' ? t('allowedToast') : t('deniedToast'));
+          }
+
+          if (nextTask && uiStatus(nextTask) !== activeStatus) {
+            activeTaskId = nextTask.id;
+            openStatus(uiStatus(nextTask), true);
+          } else {
+            reconcileView();
+          }
+          await refreshBootstrap();
+        } catch (_) {
+          showToast(t('decisionFailed'), true);
+          setConnectionState('offline');
+        } finally {
+          pendingDecisions.delete(approvalId);
+          renderInspector();
+        }
+      }
+
+      document.querySelectorAll('.category-node').forEach((node) => {
+        node.addEventListener('click', () => openStatus(node.dataset.status, true));
+      });
+      mapBack.addEventListener('click', () => showOverview(true));
+      document.querySelector('#scopeButton').addEventListener('click', () => scopeDialog.showModal());
+      document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => scopeDialog.close()));
+      document.querySelectorAll('[data-close-confirm]').forEach((button) => button.addEventListener('click', () => confirmDialog.close()));
+      confirmAllow.addEventListener('click', () => {
+        const approvalId = pendingConfirmApprovalId;
+        pendingConfirmApprovalId = null;
+        confirmDialog.close();
+        if (approvalId) submitApprovalDecision(approvalId, 'allow');
+      });
+      confirmDialog.addEventListener('close', () => { pendingConfirmApprovalId = null; });
+      [scopeDialog, confirmDialog].forEach((dialog) => {
+        dialog.addEventListener('click', (event) => {
+          if (event.target === dialog) dialog.close();
+        });
+      });
+
+      document.querySelectorAll('[data-lang]').forEach((button) => {
+        button.addEventListener('click', () => {
+          lang = button.dataset.lang === 'en' ? 'en' : 'zh';
+          try { localStorage.setItem('agentsview-lang', lang); } catch (_) {}
+          updateStaticLanguage();
+        });
+      });
+
+      loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const token = accessToken.value;
+        if (!token) return;
+        loginSubmit.disabled = true;
+        setLoginError('');
+        setConnectionState('connecting');
+        try {
+          const response = await apiFetch('/api/session', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          }, false);
+          if (response.status === 401 || response.status === 403) {
+            setLoginError('loginBadToken');
+            return;
+          }
+          if (!response.ok) {
+            setLoginError('loginUnavailable');
+            return;
+          }
+          accessToken.value = '';
+          authenticated = true;
+          const ready = await refreshBootstrap();
+          if (!ready) setLoginError('loginUnavailable');
+        } catch (_) {
+          setLoginError('loginUnavailable');
+          setConnectionState('offline');
+        } finally {
+          loginSubmit.disabled = false;
+        }
+      });
+
+      document.querySelector('#logoutButton').addEventListener('click', async () => {
+        try {
+          await apiFetch('/api/session', { method: 'DELETE' }, false);
+        } catch (_) {}
+        authenticated = false;
+        if (socket) {
+          const activeSocket = socket;
+          socket = null;
+          try { activeSocket.close(1000, 'signed out'); } catch (_) {}
+        }
+        clearTimeout(reconnectTimer);
+        tasks = [];
+        approvals = [];
+        sequence = 0;
+        serverId = null;
+        showOverview(false);
+        showLogin();
+        setConnectionState('connecting');
+        showToast(t('loggedOut'));
+      });
+
+      window.addEventListener('popstate', syncFromHash);
+      window.addEventListener('hashchange', syncFromHash);
+      window.addEventListener('online', () => {
+        if (authenticated) {
+          reconnectDelay = 800;
+          connectSocket();
+          refreshBootstrap();
+        }
+      });
+      window.addEventListener('offline', () => setConnectionState('offline'));
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && authenticated && (!socket || socket.readyState === WebSocket.CLOSED)) connectSocket();
+      });
+
+      setInterval(() => {
+        lastSyncSeconds += 1;
+        updateSyncText();
+      }, 1000);
+
+      try { lang = localStorage.getItem('agentsview-lang') === 'en' ? 'en' : 'zh'; } catch (_) {}
+      updateStaticLanguage();
+      syncFromHash();
+      setConnectionState('connecting');
+      refreshBootstrap();
+    })();
+  </script>
+</body>
+</html>

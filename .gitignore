@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Runtime state and secrets
+data/*
+!data/.gitkeep
+
+# Logs and process-manager state
+logs/
+*.log
+.pm2/
+
+# Test output
+coverage/
+.nyc_output/

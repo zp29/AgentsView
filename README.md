@@ -28,9 +28,18 @@ AgentsView 是一个面向 **Codex 与 Claude 编码代理**的轻量 Web 运行
 
 ```bash
 git clone https://github.com/zp29/AgentsView.git
-cd AgentsView
+cd AgentsView/web
 cp .env.example .env
-npm install
+npm install   # zero runtime deps today; lockfile still present
+npm run build
+npm start
+```
+
+也可以在仓库根目录用转发脚本（等价于 `npm --prefix web …`）：
+
+```bash
+cd AgentsView
+cp web/.env.example web/.env
 npm run build
 npm start
 ```
@@ -65,8 +74,10 @@ npm test
 AgentsView 必须以 **单实例 fork 模式**运行。当前版本的实时序列、审批锁和代理子进程归属都在单一服务进程中；不要改成 cluster 或多实例。
 
 ```bash
+cd web   # 或在仓库根目录：npm run build
 npm run build
 pm2 start ecosystem.config.cjs
+# 从仓库根目录：pm2 start web/ecosystem.config.cjs
 pm2 status
 pm2 logs agentsview
 ```
@@ -74,7 +85,7 @@ pm2 logs agentsview
 若系统默认 `node` 不是 22 或更高版本，可在启动 PM2 时显式指定解释器；该值需要是 Node 可执行文件的绝对路径：
 
 ```bash
-AGENTSVIEW_NODE=/absolute/path/to/node pm2 start ecosystem.config.cjs
+AGENTSVIEW_NODE=/absolute/path/to/node pm2 start ecosystem.config.cjs   # 在 web/ 下
 ```
 
 配置修改后：
@@ -85,7 +96,7 @@ pm2 restart agentsview --update-env
 
 如需随系统启动，可运行 `pm2 startup`，再按 PM2 打印的命令完成系统服务安装，最后执行 `pm2 save`。
 
-`ecosystem.config.cjs` 已配置 `instances: 1`、`exec_mode: fork` 和 `wait_ready: true`。服务完成监听和恢复状态后才向 PM2 发送 ready 信号；停止时会先停止接收新审批，再关闭 WebSocket 与适配器子进程。
+`web/ecosystem.config.cjs` 已配置 `instances: 1`、`exec_mode: fork` 和 `wait_ready: true`。服务完成监听和恢复状态后才向 PM2 发送 ready 信号；停止时会先停止接收新审批，再关闭 WebSocket 与适配器子进程。
 
 ## 手机安全访问
 
@@ -101,7 +112,7 @@ tailscale serve --bg 4173
 
 Tailscale 会把 tailnet 内的 HTTPS 地址反向代理到本机 `127.0.0.1:4173`。使用 `tailscale serve status` 查看地址。建议通过 tailnet ACL 限制可访问的用户或设备；**不要改用 Tailscale Funnel**，后者会把服务公开到互联网。
 
-把 `tailscale serve status` 显示的完整 HTTPS Origin 写入 `.env`，并允许 AgentsView 信任这个受控的本机反向代理。例如：
+把 `tailscale serve status` 显示的完整 HTTPS Origin 写入 `web/.env`，并允许 AgentsView 信任这个受控的本机反向代理。例如：
 
 ```dotenv
 AGENTSVIEW_PUBLIC_ORIGIN=https://your-machine.your-tailnet.ts.net
@@ -206,14 +217,14 @@ npm run hooks:print
 
 ## 配置
 
-完整示例见 [`.env.example`](./.env.example)。常用项：
+完整示例见 [`web/.env.example`](./web/.env.example)。常用项：
 
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
 | `AGENTSVIEW_HOST` | `127.0.0.1` | HTTP 监听地址；建议保持回环地址 |
 | `AGENTSVIEW_PORT` | `4173` | HTTP / WebSocket 端口 |
 | `AGENTSVIEW_PUBLIC_ORIGIN` | 空 | 允许的外部 Origin，可用逗号分隔多个 HTTPS Origin |
-| `AGENTSVIEW_DATA_DIR` | `./data` | 快照、访问令牌与审计数据目录 |
+| `AGENTSVIEW_DATA_DIR` | `./data`（相对 `web/`） | 快照、访问令牌与审计数据目录 |
 | `AGENTSVIEW_ACCESS_TOKEN` | 自动生成 | 首次登录的主访问令牌 |
 | `AGENTSVIEW_SESSION_TTL_HOURS` | `24` | 登录会话有效期 |
 | `AGENTSVIEW_APPROVAL_TTL_MINUTES` | `10` | 待审批请求有效期 |
@@ -238,16 +249,47 @@ npm run hooks:print
 
 除登录、健康检查与 Claude Hook 外，接口都需要有效浏览器会话。Claude Hook 不接受浏览器会话，必须提供独立共享密钥；它只接收受支持的生命周期和权限事件，不是通用命令入口。当前 MVP 有意不提供通用 shell、任意 stdin 转发、文件浏览器、多人 RBAC 或跨机器分布式调度。
 
+## AgentsBar（macOS 菜单栏）
+
+独立菜单栏观察器，**不依赖**本服务的 `npm start`。打开 App 即内置 Local Hub，首次向导可安装 Claude Code / Codex Hooks。
+
+- 文档：[docs/menubar-app.md](./docs/menubar-app.md)
+- 工程与构建：[apps/AgentsBar/README.md](./apps/AgentsBar/README.md)
+
+```bash
+cd apps/AgentsBar && ./scripts/build.sh --install
+```
+
+### 发版（tag → DMG）
+
+推送 `v*` tag 后，GitHub Actions 自动构建 ad-hoc 签名的 DMG 并挂到 Release（无需 Apple 证书）：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+# → Release: AgentsBar-0.1.0.dmg
+```
+
+本地打 DMG：`cd apps/AgentsBar && VERSION=0.1.0 ./scripts/build.sh && VERSION=0.1.0 ./scripts/package-dmg.sh`
+
 ## 项目结构
 
 ```text
 AgentsView/
-├── public/                 # 双语、响应式星图 UI
-├── src/                    # HTTP/WS、状态、审计、适配器
-├── test/                   # 状态与审批测试
-├── docs/architecture.md    # 架构、安全边界和扩展原则
-├── ecosystem.config.cjs    # PM2 单实例配置
-└── .env.example            # 安全默认配置
+├── web/                      # Node 星图控制台（原根目录项目）
+│   ├── public/               # 双语、响应式星图 UI
+│   ├── src/                  # HTTP/WS、状态、审计、适配器
+│   ├── test/                 # 状态与审批测试
+│   ├── scripts/              # build / hooks / check
+│   ├── ecosystem.config.cjs  # PM2 单实例配置
+│   └── .env.example          # 安全默认配置
+├── apps/
+│   └── AgentsBar/            # 独立 macOS 菜单栏 App（不依赖 web 服务）
+├── docs/
+│   ├── architecture.md       # Web 架构、安全边界和扩展原则
+│   └── menubar-app.md        # AgentsBar 产品说明
+├── package.json              # 根脚本转发到 web/
+└── CLAUDE.md
 ```
 
 ## 许可证

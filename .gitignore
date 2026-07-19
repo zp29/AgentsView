@@ -1,19 +1,42 @@
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+
+# Root never installs node_modules (web/ owns npm deps)
 node_modules/
+
+# Web runtime (also listed under web/ for clarity)
+web/node_modules/
+web/dist/
+web/.env
+web/.env.*
+!web/.env.example
+web/data/*
+!web/data/.gitkeep
+web/logs/
+web/*.log
+web/.pm2/
+web/coverage/
+web/.nyc_output/
+
+# Legacy paths if someone still has them at root
 dist/
 .env
 .env.*
 !.env.example
-.DS_Store
-
-# Runtime state and secrets
 data/*
 !data/.gitkeep
-
-# Logs and process-manager state
 logs/
 *.log
 .pm2/
-
-# Test output
 coverage/
 .nyc_output/
+
+# AgentsBar (Xcode)
+apps/AgentsBar/build/
+apps/AgentsBar/**/xcuserdata/
+apps/AgentsBar/**/*.xcuserstate
+
+# AgentsBar release artifacts
+apps/AgentsBar/dist/

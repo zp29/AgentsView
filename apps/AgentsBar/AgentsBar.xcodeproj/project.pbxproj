@@ -1,0 +1,296 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		49937FBDFA944EDDBC2F5EC1 /* AgentsBarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92377A6F47AF4C75BEE0BA1A /* AgentsBarApp.swift */; };
+		53D26AFF135C4894A46E9F88 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58487DA0E9F44988B279676 /* AppDelegate.swift */; };
+		9FC6393D09FF457FB54C331E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C120DF5BFB2746598A66C7E2 /* AppModel.swift */; };
+		BE78614BE9B34F66A4E3251A /* AppSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81EA6133CB6D481CBF24778E /* AppSupport.swift */; };
+		A8F1CE20C624472FA01ED37A /* HookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC1D01B51824BC994E213E4 /* HookInstaller.swift */; };
+		FA067A45963D4F968A109E90 /* LocalHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C425EC8C7BC4B2EA403AD6C /* LocalHub.swift */; };
+		8A69DC0D66964611B382744F /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20FCA7E00E3546C694DED1E3 /* MenuBarContentView.swift */; };
+		DC2D73DE0FB348928777CE91 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61052DB57966451E98737BDA /* Models.swift */; };
+		86017CCEE98E4E8D92892573 /* NameFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1447B0F10ED544C6A5956799 /* NameFormatter.swift */; };
+		47FED0CFDBE2437092E21FF4 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 735FF1A52B5E426CB985DAB5 /* OnboardingView.swift */; };
+		06758D3054134F3F98BC88B2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A261CB60564F389341D336 /* SettingsView.swift */; };
+		7E67046036394A32A60EC623 /* TaskStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBB839C86BE94BCD80DB4925 /* TaskStore.swift */; };
+		612B9D6A3449456FBBB2296A /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD47DDA7352E4D64AC8C1469 /* Theme.swift */; };
+		1B17C530702D4221A203BDF7 /* agentsbar-hook in Resources */ = {isa = PBXBuildFile; fileRef = 0B48FDDAB5284736A8B20218 /* agentsbar-hook */; };
+		A10000000000000000000014 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000006 /* AgentsBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentsBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000012 /* AgentsBar.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentsBar.entitlements; sourceTree = "<group>"; };
+		A10000000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		92377A6F47AF4C75BEE0BA1A /* AgentsBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentsBarApp.swift; sourceTree = "<group>"; };
+		E58487DA0E9F44988B279676 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		C120DF5BFB2746598A66C7E2 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		81EA6133CB6D481CBF24778E /* AppSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSupport.swift; sourceTree = "<group>"; };
+		7BC1D01B51824BC994E213E4 /* HookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstaller.swift; sourceTree = "<group>"; };
+		1C425EC8C7BC4B2EA403AD6C /* LocalHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHub.swift; sourceTree = "<group>"; };
+		20FCA7E00E3546C694DED1E3 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+		61052DB57966451E98737BDA /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		1447B0F10ED544C6A5956799 /* NameFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameFormatter.swift; sourceTree = "<group>"; };
+		735FF1A52B5E426CB985DAB5 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		92A261CB60564F389341D336 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CBB839C86BE94BCD80DB4925 /* TaskStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskStore.swift; sourceTree = "<group>"; };
+		AD47DDA7352E4D64AC8C1469 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		0B48FDDAB5284736A8B20218 /* agentsbar-hook */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = agentsbar-hook; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000007 = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000009 /* AgentsBar */,
+				A10000000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000006 /* AgentsBar.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000009 /* AgentsBar */ = {
+			isa = PBXGroup;
+			children = (
+				92377A6F47AF4C75BEE0BA1A /* AgentsBarApp.swift */,
+				E58487DA0E9F44988B279676 /* AppDelegate.swift */,
+				C120DF5BFB2746598A66C7E2 /* AppModel.swift */,
+				81EA6133CB6D481CBF24778E /* AppSupport.swift */,
+				7BC1D01B51824BC994E213E4 /* HookInstaller.swift */,
+				1C425EC8C7BC4B2EA403AD6C /* LocalHub.swift */,
+				20FCA7E00E3546C694DED1E3 /* MenuBarContentView.swift */,
+				61052DB57966451E98737BDA /* Models.swift */,
+				1447B0F10ED544C6A5956799 /* NameFormatter.swift */,
+				735FF1A52B5E426CB985DAB5 /* OnboardingView.swift */,
+				92A261CB60564F389341D336 /* SettingsView.swift */,
+				CBB839C86BE94BCD80DB4925 /* TaskStore.swift */,
+				AD47DDA7352E4D64AC8C1469 /* Theme.swift */,
+				A10000000000000000000013 /* Assets.xcassets */,
+				A10000000000000000000011 /* Info.plist */,
+				A10000000000000000000012 /* AgentsBar.entitlements */,
+				A1000000000000000000000A /* Resources */,
+			);
+			path = AgentsBar;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				0B48FDDAB5284736A8B20218 /* agentsbar-hook */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000002 /* AgentsBar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000000C /* Build configuration list for PBXNativeTarget "AgentsBar" */;
+			buildPhases = (
+				A10000000000000000000003 /* Sources */,
+				A10000000000000000000005 /* Frameworks */,
+				A10000000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AgentsBar;
+			productName = AgentsBar;
+			productReference = A10000000000000000000006 /* AgentsBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = A1000000000000000000000B /* Build configuration list for PBXProject "AgentsBar" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				"zh-Hans",
+			);
+			mainGroup = A10000000000000000000007;
+			productRefGroup = A10000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A10000000000000000000002 /* AgentsBar */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A10000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B17C530702D4221A203BDF7 /* agentsbar-hook in Resources */,
+				A10000000000000000000014 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				49937FBDFA944EDDBC2F5EC1 /* AgentsBarApp.swift in Sources */,
+				53D26AFF135C4894A46E9F88 /* AppDelegate.swift in Sources */,
+				9FC6393D09FF457FB54C331E /* AppModel.swift in Sources */,
+				BE78614BE9B34F66A4E3251A /* AppSupport.swift in Sources */,
+				A8F1CE20C624472FA01ED37A /* HookInstaller.swift in Sources */,
+				FA067A45963D4F968A109E90 /* LocalHub.swift in Sources */,
+				8A69DC0D66964611B382744F /* MenuBarContentView.swift in Sources */,
+				DC2D73DE0FB348928777CE91 /* Models.swift in Sources */,
+				86017CCEE98E4E8D92892573 /* NameFormatter.swift in Sources */,
+				47FED0CFDBE2437092E21FF4 /* OnboardingView.swift in Sources */,
+				06758D3054134F3F98BC88B2 /* SettingsView.swift in Sources */,
+				7E67046036394A32A60EC623 /* TaskStore.swift in Sources */,
+				612B9D6A3449456FBBB2296A /* Theme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A1000000000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		A1000000000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		A1000000000000000000000F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AgentsBar/AgentsBar.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AgentsBar/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentsview.bar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A10000000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AgentsBar/AgentsBar.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AgentsBar/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentsview.bar;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1000000000000000000000B /* Build configuration list for PBXProject "AgentsBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000000D /* Debug */,
+				A1000000000000000000000E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000000C /* Build configuration list for PBXNativeTarget "AgentsBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000000F /* Debug */,
+				A10000000000000000000010 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A10000000000000000000001 /* Project object */;
+}

@@ -179,6 +179,8 @@
     }
     .adapter[data-enabled="false"] { color: var(--dim); opacity: .62; }
     .adapter[data-enabled="false"] i { background: var(--dim); box-shadow: none; }
+    .adapter[data-enabled="configured"] { color: #d7b96b; }
+    .adapter[data-enabled="configured"] i { background: var(--amber); box-shadow: 0 0 10px rgba(var(--amber-rgb), .7); }
     .adapter[data-enabled="demo"] i { background: var(--amber); box-shadow: 0 0 10px rgba(var(--amber-rgb), .7); }
 
     .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
@@ -859,8 +861,8 @@
       </div>
 
       <div class="bridge-status" aria-label="Adapter status">
-        <div class="adapter" id="codexAdapter" data-enabled="false"><i></i>Codex app-server</div>
-        <div class="adapter" id="claudeAdapter" data-enabled="false"><i></i>Claude Agent SDK</div>
+        <div class="adapter" id="codexAdapter" data-enabled="false"><i></i><span>Codex CLI</span></div>
+        <div class="adapter" id="claudeAdapter" data-enabled="false"><i></i><span>Claude Code</span></div>
       </div>
 
       <div class="top-actions">
@@ -1074,7 +1076,7 @@
           keep3: '单次允许与拒绝', keep4: '中英文与手机适配', keep5: '本机登录、审计记录和断线提示',
           defer1: '完整终端、聊天与文件浏览器', defer2: '永久允许规则与批量审批', defer3: '跨供应商精确费用核算',
           defer4: '任意命令输入、暂停与接管', defer5: '多主机、团队权限与公网部署',
-          adapterNote: '接入建议：Codex 使用 app-server 的线程状态与审批请求；Claude Code 优先使用 Agent SDK 的 canUseTool 回调。Hooks 更适合作为通知和兼容层。',
+          adapterNote: '真实终端会话通过 Codex / Claude Code Hooks 接入状态与单次审批；由 AgentsView 新建的任务可使用 Codex app-server。Claude Agent SDK 是需要 API key 的可选启动器，不影响 Claude Code Hooks。',
           confirmExternal: '确认外部写入', confirmBody: '该命令会修改远程状态。请再次确认只允许当前这一次请求。', cancel: '取消', confirmOnce: '确认，仅本次',
           overviewCrumb: '状态总览 / 第 1 层', overviewTitle: '选择一种状态进入任务星图',
           runningCrumb: '状态总览 / 运行中', runningTitle: '正在执行的任务', approvalCrumb: '状态总览 / 待审批', approvalTitle: '等待你决策的任务',
@@ -1102,7 +1104,7 @@
           keep3: 'Allow once and deny', keep4: 'Chinese/English and mobile layout', keep5: 'Local auth, audit trail, and disconnect state',
           defer1: 'Full terminal, chat, and file browser', defer2: 'Persistent rules and bulk approval', defer3: 'Exact cross-provider cost accounting',
           defer4: 'Arbitrary command input, pause, and takeover', defer5: 'Multi-host, team roles, and public deployment',
-          adapterNote: 'Integration: use Codex app-server thread status and approval requests; use the Claude Agent SDK canUseTool callback first. Hooks are better as notification and compatibility layers.',
+          adapterNote: 'Real terminal sessions connect through Codex / Claude Code Hooks for status and one-time approvals. AgentsView-managed tasks can use Codex app-server. Claude Agent SDK is an optional API-key launcher and does not affect Claude Code Hooks.',
           confirmExternal: 'Confirm external write', confirmBody: 'This command changes remote state. Confirm that you want to allow this request once.', cancel: 'Cancel', confirmOnce: 'Confirm once',
           overviewCrumb: 'STATUS OVERVIEW / LEVEL 1', overviewTitle: 'Choose a status to enter its task map',
           runningCrumb: 'STATUS OVERVIEW / RUNNING', runningTitle: 'Tasks currently executing', approvalCrumb: 'STATUS OVERVIEW / WAITING APPROVAL', approvalTitle: 'Tasks waiting for your decision',
@@ -1137,7 +1139,10 @@
         loggedOut: '已退出安全会话。', allowedToast: '已允许本次请求', deniedToast: '已拒绝本次请求',
         cost: '估算费用', tokens: 'Tokens', outcome: '结果状态', success: '成功', failed: '失败',
         cancelled: '已取消', interrupted: '已中断', noActivity: '暂时没有活动记录',
-        adapterDemo: '演示', adapterReady: '就绪', adapterOff: '未启用', filesChangedUnknown: '—',
+        adapterDemo: '演示', adapterReady: '已连接', adapterConfigured: '已配置，等待新会话', adapterOff: '未启用',
+        codexManagedReady: '托管启动器已就绪', codexManagedOff: '托管启动器未启用',
+        claudeSdkReady: 'Agent SDK 已就绪', claudeSdkOff: 'Agent SDK 未配置（可选）',
+        hookLive: 'CLI Hook 已收到真实会话事件', hookWaiting: 'CLI Hook 已配置，等待新会话', filesChangedUnknown: '—',
         live: '实时', localBridge: '本机 BRIDGE · 状态流 · 受限决策通道'
       });
       Object.assign(translations.en, {
@@ -1161,13 +1166,20 @@
         loggedOut: 'Secure session ended.', allowedToast: 'Request allowed once', deniedToast: 'Request denied',
         cost: 'Est. cost', tokens: 'Tokens', outcome: 'Outcome', success: 'Success', failed: 'Failed',
         cancelled: 'Cancelled', interrupted: 'Interrupted', noActivity: 'No activity has been reported yet',
-        adapterDemo: 'Demo', adapterReady: 'Ready', adapterOff: 'Off', filesChangedUnknown: '—',
+        adapterDemo: 'Demo', adapterReady: 'Connected', adapterConfigured: 'Configured; waiting for a new session', adapterOff: 'Off',
+        codexManagedReady: 'Managed launcher ready', codexManagedOff: 'Managed launcher unavailable',
+        claudeSdkReady: 'Agent SDK ready', claudeSdkOff: 'Agent SDK not configured (optional)',
+        hookLive: 'CLI Hook received a real session event', hookWaiting: 'CLI Hook configured; waiting for a new session', filesChangedUnknown: '—',
         live: 'LIVE', localBridge: 'LOCAL BRIDGE · STATE STREAM · RESTRICTED DECISIONS'
       });
 
       let tasks = [];
       let approvals = [];
-      let capabilities = { demo: false, codex: false, claude: false, claudeHooks: false };
+      let capabilities = {
+        demo: false, codex: false, claude: false,
+        codexHooks: false, codexHooksLastSeenAt: null,
+        claudeHooks: false, claudeHooksLastSeenAt: null
+      };
       let serverId = null;
       let sequence = 0;
       const mapCard = document.querySelector('#mapCard');
@@ -1722,10 +1734,12 @@
       }
 
       function updateAdapters() {
-        codexAdapter.dataset.enabled = capabilities.codex ? 'true' : 'false';
-        claudeAdapter.dataset.enabled = capabilities.claude ? 'true' : 'false';
-        codexAdapter.title = capabilities.codex ? t('adapterReady') : t('adapterOff');
-        claudeAdapter.title = capabilities.claude ? t('adapterReady') : t('adapterOff');
+        const codexLive = Boolean(capabilities.codexHooksLastSeenAt);
+        const claudeLive = Boolean(capabilities.claudeHooksLastSeenAt);
+        codexAdapter.dataset.enabled = codexLive || capabilities.codex ? 'true' : capabilities.codexHooks ? 'configured' : 'false';
+        claudeAdapter.dataset.enabled = claudeLive || capabilities.claude ? 'true' : capabilities.claudeHooks ? 'configured' : 'false';
+        codexAdapter.title = `${codexLive ? t('hookLive') : capabilities.codexHooks ? t('hookWaiting') : t('adapterOff')} · ${capabilities.codex ? t('codexManagedReady') : t('codexManagedOff')}`;
+        claudeAdapter.title = `${claudeLive ? t('hookLive') : capabilities.claudeHooks ? t('hookWaiting') : t('adapterOff')} · ${capabilities.claude ? t('claudeSdkReady') : t('claudeSdkOff')}`;
       }
 
       function renderAll() {
@@ -1819,7 +1833,7 @@
         connectionState = next;
         connectionStrip.dataset.state = next;
         livePill.dataset.state = next;
-        const hasRealAdapter = capabilities.codex || capabilities.claude || capabilities.claudeHooks;
+        const hasRealAdapter = capabilities.codex || capabilities.claude || capabilities.codexHooks || capabilities.claudeHooks;
         const key = next === 'connected'
           ? (capabilities.demo && !hasRealAdapter ? 'demoConnected' : 'bridgeConnected')
           : next === 'offline' ? 'bridgeOffline' : 'bridgeConnecting';
@@ -1889,7 +1903,10 @@
             demo: Boolean(snapshot.capabilities.demo),
             codex: Boolean(snapshot.capabilities.codex),
             claude: Boolean(snapshot.capabilities.claude),
-            claudeHooks: Boolean(snapshot.capabilities.claudeHooks)
+            codexHooks: Boolean(snapshot.capabilities.codexHooks),
+            codexHooksLastSeenAt: snapshot.capabilities.codexHooksLastSeenAt || null,
+            claudeHooks: Boolean(snapshot.capabilities.claudeHooks),
+            claudeHooksLastSeenAt: snapshot.capabilities.claudeHooksLastSeenAt || null
           };
         }
         if (snapshot.serverId) serverId = String(snapshot.serverId);

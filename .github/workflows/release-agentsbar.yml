@@ -1,0 +1,137 @@
+# Ad-hoc signed AgentsBar.app → DMG → GitHub Release on version tags.
+#
+# Tag format: v0.1.0 (semver with leading v)
+#   git tag v0.1.0
+#   git push origin v0.1.0
+#
+# Manual run: Actions → Release AgentsBar → Run workflow (optional version).
+#
+# Distribution is path A: no Apple Developer ID / notarization.
+# Users may need Privacy & Security → Open Anyway on first launch.
+
+name: Release AgentsBar
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 0.1.0). Empty = use tag or 0.0.0-dev.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-agentsbar-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dmg:
+    name: Build DMG
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: meta
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          VERSION="${VERSION#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "Invalid version: $VERSION (expected semver, optional suffix)" >&2
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          # Numeric build for CFBundleVersion (digits only).
+          BUILD_NUMBER="$(echo "$VERSION" | tr -cd '0-9' | sed 's/^0*//')"
+          BUILD_NUMBER="${BUILD_NUMBER:-1}"
+          {
+            echo "version=${VERSION}"
+            echo "tag=${TAG}"
+            echo "build_number=${BUILD_NUMBER}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved version=${VERSION} tag=${TAG} build=${BUILD_NUMBER}"
+
+      - name: Select Xcode
+        run: |
+          # Prefer a recent Xcode on the image; fall back to default.
+          if [[ -d /Applications/Xcode_16.4.app ]]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          elif [[ -d /Applications/Xcode.app ]]; then
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Build AgentsBar.app
+        working-directory: apps/AgentsBar
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          BUILD_NUMBER: ${{ steps.meta.outputs.build_number }}
+        run: |
+          chmod +x scripts/build.sh scripts/package-dmg.sh
+          ./scripts/build.sh
+
+      - name: Package DMG
+        id: dmg
+        working-directory: apps/AgentsBar
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: ./scripts/package-dmg.sh
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgentsBar-${{ steps.meta.outputs.version }}
+          path: apps/AgentsBar/dist/AgentsBar-${{ steps.meta.outputs.version }}.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create GitHub Release
+        # Only publish when this run is for a real version tag (or dispatch with version).
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.version != '')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: AgentsBar ${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(steps.meta.outputs.version, '-') }}
+          fail_on_unmatched_files: true
+          files: |
+            apps/AgentsBar/dist/AgentsBar-${{ steps.meta.outputs.version }}.dmg
+          body: |
+            ## AgentsBar ${{ steps.meta.outputs.version }}
+
+            macOS menu bar observer for Claude Code / Codex (ad-hoc signed, **not** Developer ID notarized).
+
+            ### Install
+            1. Download `AgentsBar-${{ steps.meta.outputs.version }}.dmg`
+            2. Open the DMG and drag **AgentsBar** into **Applications**
+            3. Launch AgentsBar
+            4. If Gatekeeper blocks it: **System Settings → Privacy & Security → Open Anyway**
+
+            ### Notes
+            - Requires macOS 14+
+            - Ships its own Local Hub (`127.0.0.1:18273`); does not need the Node `web/` server
+            - First launch: install Claude / Codex hooks from the onboarding wizard
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

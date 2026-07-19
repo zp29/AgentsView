@@ -96,6 +96,13 @@ test('refreshes showcase tasks without accumulating stale demo history', async (
   assert.equal(second.tasks.find((task) => task.id === 'demo-showcase-payment').status, 'running');
 });
 
+test('removes stale showcase tasks when demo mode is disabled', async (t) => {
+  const { manager, store } = await managerFixture(t);
+  await store.upsertTask({ id: 'demo-showcase-stale', title: 'Demo', agent: 'demo', status: 'completed' });
+  await manager.start();
+  assert.equal(store.getTask('demo-showcase-stale'), null);
+});
+
 test('runs the registered expiry handler when an approval reaches its deadline', async (t) => {
   const { manager, store } = await managerFixture(t, 25);
   await store.upsertTask({ id: 'task', title: 'Task', agent: 'codex', status: 'running' });

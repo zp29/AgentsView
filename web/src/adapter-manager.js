@@ -1,5 +1,5 @@
 import { CodexAdapter } from './adapters/codex.js';
-import { ClaudeHookBridge, ClaudeSdkAdapter } from './adapters/claude.js';
+import { ClaudeHookBridge, ClaudeSdkAdapter, CodexHookBridge } from './adapters/claude.js';
 import { DemoAdapter } from './adapters/demo.js';
 import { assessRisk, boundedText, commandSummary, hashText, isoNow, randomId } from './utils.js';
 
@@ -14,7 +14,15 @@ export class AdapterManager {
     this.outputBuffers = new Map();
     this.approvalExpiryTimers = new Map();
     this.approvalExpiryHandler = null;
-    this.capabilityState = { demo: config.demoMode, codex: false, claude: false, claudeHooks: Boolean(config.claudeHookSecret) };
+    this.capabilityState = {
+      demo: config.demoMode,
+      codex: false,
+      claude: false,
+      codexHooks: Boolean(config.claudeHookSecret),
+      codexHooksLastSeenAt: null,
+      claudeHooks: Boolean(config.claudeHookSecret),
+      claudeHooksLastSeenAt: null,
+    };
 
     const onEvent = (event) => this.enqueueEvent(event);
     this.demo = new DemoAdapter({ onEvent });
@@ -23,7 +31,12 @@ export class AdapterManager {
       onEvent, apiKey: config.anthropicApiKey,
       enabled: config.claudeMode !== 'false',
     });
-    this.claudeHooks = new ClaudeHookBridge({ store, approvalTtlMs: config.approvalTtlMs });
+    const onHookSeen = ({ provider, at }) => {
+      this.capabilityState[`${provider}HooksLastSeenAt`] = at;
+      this.onCapabilitiesChanged(this.capabilities());
+    };
+    this.claudeHooks = new ClaudeHookBridge({ store, approvalTtlMs: config.approvalTtlMs, onSeen: onHookSeen });
+    this.codexHooks = new CodexHookBridge({ store, approvalTtlMs: config.approvalTtlMs, onSeen: onHookSeen });
   }
 
   capabilities() {
@@ -31,8 +44,8 @@ export class AdapterManager {
   }
 
   async start() {
+    await this.store.clearTasksByPrefix('demo-showcase-');
     if (this.config.demoMode) {
-      await this.store.clearTasksByPrefix('demo-showcase-');
       await this.demo.seed(this.store.snapshot().tasks);
     }
     if (this.config.codexMode !== 'false') {
@@ -258,6 +271,7 @@ export class AdapterManager {
     if (ref.adapter === 'codex') return this.codex.resolveApproval(ref.requestId, decision);
     if (ref.adapter === 'claude') return this.claude.resolveApproval(ref.requestId, decision);
     if (ref.adapter === 'claude-hook') return this.claudeHooks.resolveApproval(ref.requestId, decision);
+    if (ref.adapter === 'codex-hook') return this.codexHooks.resolveApproval(ref.requestId, decision);
     if (ref.adapter === 'demo') return this.demo.resolveApproval(ref.requestId, decision);
     throw new Error(`Unknown approval adapter: ${ref.adapter}`);
   }
@@ -266,12 +280,16 @@ export class AdapterManager {
     return this.claudeHooks.handle(input);
   }
 
+  handleCodexHook(input) {
+    return this.codexHooks.handle(input);
+  }
+
   async stop() {
     for (const timer of this.outputTimers.values()) clearTimeout(timer);
     this.outputTimers.clear();
     for (const timer of this.approvalExpiryTimers.values()) clearTimeout(timer);
     this.approvalExpiryTimers.clear();
-    await Promise.allSettled([this.demo.stop(), this.codex.stop(), this.claude.stop(), this.claudeHooks.stop()]);
+    await Promise.allSettled([this.demo.stop(), this.codex.stop(), this.claude.stop(), this.claudeHooks.stop(), this.codexHooks.stop()]);
     await this.eventQueue;
   }
 }

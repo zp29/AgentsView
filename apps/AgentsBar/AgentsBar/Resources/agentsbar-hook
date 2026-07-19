@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# AgentsBar hook relay — installed to Application Support (stable path).
+# Reads JSON from stdin, POSTs to the local AgentsBar hub, always exits 0 for CLI.
+set -euo pipefail
+
+PROVIDER="${1:-}"
+if [[ "$PROVIDER" != "claude" && "$PROVIDER" != "codex" ]]; then
+  echo "[AgentsBar] provider must be claude or codex" >&2
+  echo '{}'
+  exit 0
+fi
+
+SUPPORT="${HOME}/Library/Application Support/AgentsBar"
+SECRET_FILE="${SUPPORT}/hook-secret"
+PORT_FILE="${SUPPORT}/hub-port"
+PORT=18273
+if [[ -f "$PORT_FILE" ]]; then
+  PORT="$(tr -d '[:space:]' < "$PORT_FILE" || true)"
+  [[ -n "$PORT" ]] || PORT=18273
+fi
+
+if [[ ! -f "$SECRET_FILE" ]]; then
+  echo "[AgentsBar] hook secret missing; open AgentsBar once" >&2
+  echo '{}'
+  exit 0
+fi
+
+SECRET="$(tr -d '[:space:]' < "$SECRET_FILE")"
+BODY="$(cat || true)"
+if [[ -z "${BODY//[[:space:]]/}" ]]; then
+  BODY='{}'
+fi
+
+# Validate JSON lightly; never block the agent on hub failure.
+if ! /usr/bin/python3 -c 'import json,sys; json.loads(sys.stdin.read() or "{}")' <<<"$BODY" 2>/dev/null; then
+  echo "[AgentsBar] invalid JSON on stdin" >&2
+  echo '{}'
+  exit 0
+fi
+
+URL="http://127.0.0.1:${PORT}/hooks/${PROVIDER}"
+RESPONSE="$(/usr/bin/curl -sS -m 3 \
+  -X POST "$URL" \
+  -H "Content-Type: application/json" \
+  -H "X-AgentsBar-Hook-Secret: ${SECRET}" \
+  --data-binary "$BODY" 2>/dev/null || true)"
+
+if [[ -z "${RESPONSE//[[:space:]]/}" ]]; then
+  echo '{}'
+else
+  printf '%s' "$RESPONSE"
+fi
+exit 0

@@ -49,7 +49,10 @@ function capabilities() {
     demo: config.demoMode,
     codex: false,
     claude: false,
+    codexHooks: Boolean(config.claudeHookSecret),
+    codexHooksLastSeenAt: null,
     claudeHooks: Boolean(config.claudeHookSecret),
+    claudeHooksLastSeenAt: null,
   };
 }
 
@@ -200,11 +203,13 @@ function hookAuthenticated(request) {
   return left.length > 0 && left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
-async function handleClaudeHook(request, response) {
-  if (!runtimeConfig.claudeHookSecret) return errorJson(response, 503, 'hooks_disabled', 'Claude Hooks are not configured.');
-  if (!hookAuthenticated(request)) return errorJson(response, 401, 'invalid_hook_secret', 'Claude Hook authentication failed.');
+async function handleAgentHook(request, response, provider) {
+  if (!runtimeConfig.claudeHookSecret) return errorJson(response, 503, 'hooks_disabled', 'Agent Hooks are not configured.');
+  if (!hookAuthenticated(request)) return errorJson(response, 401, 'invalid_hook_secret', 'Agent Hook authentication failed.');
   const input = await readJsonBody(request, 256 * 1024);
-  const result = await adapters.handleClaudeHook(input);
+  const result = provider === 'codex'
+    ? await adapters.handleCodexHook(input)
+    : await adapters.handleClaudeHook(input);
   json(response, 200, result);
 }
 
@@ -221,7 +226,8 @@ async function route(request, response) {
   }
   if (shuttingDown) return errorJson(response, 503, 'server_shutting_down', 'The server is shutting down.');
   if (url.pathname === '/api/session') return handleSession(request, response);
-  if (request.method === 'POST' && url.pathname === '/api/hooks/claude') return handleClaudeHook(request, response);
+  const hookMatch = url.pathname.match(/^\/api\/hooks\/(claude|codex)$/);
+  if (request.method === 'POST' && hookMatch) return handleAgentHook(request, response, hookMatch[1]);
   if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) return serveIndex(response);
   if (request.method === 'GET' && url.pathname === '/favicon.ico') {
     response.writeHead(204);

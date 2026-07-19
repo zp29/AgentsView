@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { agentEnvironment, assessRisk, boundedText, commandSummary, hashText, isoNow } from '../utils.js';
+import { agentEnvironment, assessRisk, basenameOnly, boundedText, commandSummary, hashText, isoNow } from '../utils.js';
 
 export class ClaudeSdkAdapter {
   constructor({ onEvent, apiKey, enabled = true }) {
@@ -113,53 +113,59 @@ export class ClaudeSdkAdapter {
 }
 
 export class ClaudeHookBridge {
-  constructor({ store, approvalTtlMs }) {
+  constructor({ store, approvalTtlMs, provider = 'claude', onSeen = () => {} }) {
     this.store = store;
     this.approvalTtlMs = approvalTtlMs;
+    this.provider = provider;
+    this.onSeen = onSeen;
+    this.displayName = provider === 'codex' ? 'Codex' : 'Claude Code';
+    this.adapterRef = `${provider}-hook`;
     this.pending = new Map();
   }
 
   async handle(input) {
     const eventName = boundedText(input.hook_event_name, 80);
     const sessionId = boundedText(input.session_id, 240);
-    if (!eventName || !sessionId) throw Object.assign(new Error('Claude hook event and session id are required.'), { statusCode: 400, code: 'invalid_hook_event' });
+    if (!eventName || !sessionId) throw Object.assign(new Error(`${this.displayName} hook event and session id are required.`), { statusCode: 400, code: 'invalid_hook_event' });
+    this.onSeen({ provider: this.provider, eventName, at: isoNow() });
     const task = await this.ensureTask(sessionId, input);
     if (eventName === 'PermissionRequest') return this.permission(task.id, input);
 
     if (eventName === 'UserPromptSubmit') {
-      await this.store.upsertTask({ id: task.id, status: 'running', summary: boundedText(input.prompt, 520, 'Claude is processing a prompt.') });
+      await this.store.upsertTask({ id: task.id, status: 'running', summary: boundedText(input.prompt, 520, `${this.displayName} is processing a prompt.`) });
     } else if (eventName === 'Stop') {
-      await this.store.upsertTask({ id: task.id, status: 'completed', outcome: 'success', summary: boundedText(input.last_assistant_message, 520, 'Claude finished the task.') });
+      await this.store.upsertTask({ id: task.id, status: 'completed', outcome: 'success', summary: boundedText(input.last_assistant_message, 520, `${this.displayName} finished the task.`) });
     } else if (eventName === 'StopFailure') {
-      await this.store.upsertTask({ id: task.id, status: 'completed', outcome: 'failed', summary: boundedText(input.error, 520, 'Claude stopped with an error.') });
+      await this.store.upsertTask({ id: task.id, status: 'completed', outcome: 'failed', summary: boundedText(input.error, 520, `${this.displayName} stopped with an error.`) });
     } else if (eventName === 'SessionEnd') {
       const current = this.store.getTask(task.id);
-      if (current?.status !== 'completed') await this.store.upsertTask({ id: task.id, status: 'completed', outcome: 'interrupted', summary: 'Claude session ended.' });
-    } else if (['PreToolUse', 'PostToolUse', 'PostToolUseFailure'].includes(eventName)) {
+      if (current?.status !== 'completed') await this.store.upsertTask({ id: task.id, status: 'completed', outcome: 'interrupted', summary: `${this.displayName} session ended.` });
+    } else if (['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'SubagentStart', 'SubagentStop'].includes(eventName)) {
       await this.store.addActivity(task.id, {
-        type: eventName, label: boundedText(input.tool_name, 120, eventName),
-        detail: commandSummary(input.tool_name, input.tool_input), at: isoNow(),
+        type: eventName, label: boundedText(input.tool_name || input.agent_type, 120, eventName),
+        detail: commandSummary(input.tool_name || input.agent_type, input.tool_input || input), at: isoNow(),
       });
     }
     return {};
   }
 
   async ensureTask(sessionId, input) {
-    const existing = this.store.findTaskByExternalId('claude', sessionId);
+    const existing = this.store.findTaskByExternalId(this.provider, sessionId);
     if (existing) {
       if (existing.status !== 'completed' || input.hook_event_name === 'SessionEnd') return existing;
     }
-    const id = `claude-hook-${hashText(sessionId)}-${randomUUID().slice(0, 8)}`;
+    const id = `${this.provider}-hook-${hashText(sessionId)}-${randomUUID().slice(0, 8)}`;
+    const project = basenameOnly(boundedText(input.cwd, 1000));
     return this.store.upsertTask({
-      id, externalId: sessionId, title: boundedText(input.session_title, 160, `Claude · ${hashText(sessionId).slice(0, 6)}`),
-      agent: 'claude', status: 'running', cwd: boundedText(input.cwd, 1000),
-      summary: existing ? 'Claude Code session started a new task through Hooks.' : 'Claude Code session connected through Hooks.',
+      id, externalId: sessionId, title: boundedText(input.session_title, 160, `${this.displayName} · ${project || hashText(sessionId).slice(0, 6)}`),
+      agent: this.provider, status: 'running', cwd: boundedText(input.cwd, 1000),
+      summary: existing ? `${this.displayName} session started a new task through Hooks.` : `${this.displayName} session connected through Hooks.`,
       startedAt: isoNow(),
     });
   }
 
   async permission(taskId, input) {
-    const nativeId = `claude-hook:${randomUUID()}`;
+    const nativeId = `${this.adapterRef}:${randomUUID()}`;
     const toolName = boundedText(input.tool_name, 120, 'Tool');
     const toolInput = input.tool_input && typeof input.tool_input === 'object' ? structuredClone(input.tool_input) : {};
     const expiresAt = new Date(Date.now() + this.approvalTtlMs).toISOString();
@@ -171,7 +177,7 @@ export class ClaudeHookBridge {
       summary: commandSummary(toolName, toolInput),
       details: boundedText(toolInput, 1000),
       requestedAt: isoNow(), expiresAt,
-      adapterRef: { adapter: 'claude-hook', requestId: nativeId },
+      adapterRef: { adapter: this.adapterRef, requestId: nativeId },
     });
     return new Promise((resolve) => {
       const timer = setTimeout(async () => {
@@ -196,7 +202,7 @@ export class ClaudeHookBridge {
 
   async resolveApproval(requestId, decision) {
     const pending = this.pending.get(requestId);
-    if (!pending) throw new Error(`Claude Hook approval is no longer pending: ${requestId}`);
+    if (!pending) throw new Error(`${this.displayName} Hook approval is no longer pending: ${requestId}`);
     this.pending.delete(requestId);
     clearTimeout(pending.timer);
     pending.resolve(this.hookDecision(decision, pending.toolInput));
@@ -209,5 +215,11 @@ export class ClaudeHookBridge {
       pending.resolve(this.hookDecision('deny', pending.toolInput, 'AgentsView is shutting down.'));
     }
     this.pending.clear();
+  }
+}
+
+export class CodexHookBridge extends ClaudeHookBridge {
+  constructor(options) {
+    super({ ...options, provider: 'codex' });
   }
 }

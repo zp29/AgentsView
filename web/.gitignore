@@ -1,0 +1,20 @@
+# Runtime state and secrets (local only)
+data/*
+!data/.gitkeep
+
+# Build output
+dist/
+node_modules/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs / PM2 / coverage
+logs/
+*.log
+.pm2/
+coverage/
+.nyc_output/
+.DS_Store

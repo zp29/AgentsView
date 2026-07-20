@@ -158,17 +158,27 @@ enum StatusItemBadge {
     ) -> NSImage {
         let text = countText ?? ""
         let showText = !text.isEmpty
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         let textAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold),
+            .font: font,
             // Always white so the count stays readable on dark menu bars and inside tinted chips.
             .foregroundColor: NSColor.white,
         ]
-        let textSize = showText
-            ? (text as NSString).size(withAttributes: textAttrs)
-            : .zero
+        // Use glyph bounds / cap-height for vertical optical centering — NSString.size height
+        // includes asymmetric leading that makes digits look high relative to the logo.
+        let textWidth: CGFloat
+        let textHeight: CGFloat
+        if showText {
+            let raw = (text as NSString).size(withAttributes: textAttrs)
+            textWidth = ceil(raw.width)
+            textHeight = ceil(font.capHeight)
+        } else {
+            textWidth = 0
+            textHeight = 0
+        }
 
-        let contentWidth = logoPoint + (showText ? iconTextGap + ceil(textSize.width) : 0)
-        let contentHeight = max(logoPoint, ceil(textSize.height), minHeight - contentInsetY * 2)
+        let contentWidth = logoPoint + (showText ? iconTextGap + textWidth : 0)
+        let contentHeight = max(logoPoint, textHeight, minHeight - contentInsetY * 2)
 
         let framed = ring != .none
         let padX = framed ? contentInsetX : 1
@@ -255,18 +265,25 @@ enum StatusItemBadge {
             }
         }
 
+        // Center logo and digits on the same horizontal midline of the chip.
+        let midY = contentY + contentHeight / 2
+
         let logoRect = NSRect(
             x: contentX,
-            y: contentY + (contentHeight - logoPoint) / 2,
+            y: midY - logoPoint / 2,
             width: logoPoint,
             height: logoPoint
         )
         logo.draw(in: logoRect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
         if showText {
+            // Baseline so the cap-height box is centered on midY (optical align with logo).
+            // descender is negative; add a tiny nudge so rounded digits sit with the orbit mark.
+            // let baseline = midY - font.capHeight / 2 - font.descender - 0.5
+            let baseline = midY - logoPoint / 2
             let textOrigin = NSPoint(
                 x: contentX + logoPoint + iconTextGap,
-                y: contentY + (contentHeight - textSize.height) / 2 - 0.5
+                y: baseline
             )
             (text as NSString).draw(at: textOrigin, withAttributes: textAttrs)
         }

@@ -17,6 +17,14 @@ enum ABTheme {
     static let danger = Color(red: 1.0, green: 0.42, blue: 0.45)
     static let offline = Color(red: 0.55, green: 0.58, blue: 0.64)
 
+    /// Menu-bar icon ring colors (user-facing: green / red-orange / red flash).
+    static let ringRunning = Color(red: 0.22, green: 0.90, blue: 0.48)   // green
+    static let ringWaiting = Color(red: 1.0, green: 0.42, blue: 0.18)    // red-orange
+    static let ringCompleted = Color(red: 1.0, green: 0.28, blue: 0.32)  // red
+
+    /// List-row highlight when a running task has been idle ≥ 45 minutes.
+    static let stale = Color(red: 1.0, green: 0.55, blue: 0.18)          // warm orange
+
     static let cc = Color(red: 0.72, green: 0.68, blue: 0.98)             // soft lilac
     static let gpt = Color(red: 0.45, green: 0.82, blue: 0.95)            // ice blue
 

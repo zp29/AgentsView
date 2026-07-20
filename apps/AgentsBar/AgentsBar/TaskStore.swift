@@ -47,6 +47,40 @@ final class TaskStore: @unchecked Sendable {
         return result
     }
 
+    /// Idle threshold used only for UI highlighting — never auto-completes.
+    static let staleHighlightInterval: TimeInterval = 45 * 60
+
+    /// Whether an open task has had no hook activity for `interval` (default 45 minutes).
+    func isStale(_ task: AgentTask, now: Date = Date(), interval: TimeInterval = TaskStore.staleHighlightInterval) -> Bool {
+        guard task.status == .running || task.status == .waitingApproval else { return false }
+        return now.timeIntervalSince(task.updatedAt) >= interval
+    }
+
+    /// User-driven status change (observation UI only — does not affect the real agent).
+    func setStatus(id: String, status: TaskStatus, outcome: String? = nil, summary: String? = nil) {
+        queue.sync {
+            guard var task = tasks[id] else { return }
+            let now = Date()
+            task.status = status
+            task.updatedAt = now
+            if status == .completed {
+                task.completedAt = now
+                task.outcome = outcome ?? task.outcome ?? "success"
+                if let summary, !summary.isEmpty {
+                    task.summary = String(summary.prefix(400))
+                }
+            } else {
+                task.completedAt = nil
+                if status == .running {
+                    task.outcome = nil
+                }
+            }
+            tasks[id] = task
+            persistLocked()
+            notifyLocked()
+        }
+    }
+
     func removeTasks(ids: Set<String>) {
         queue.sync {
             for id in ids { tasks.removeValue(forKey: id) }
@@ -144,14 +178,19 @@ final class TaskStore: @unchecked Sendable {
                 }
             case "Stop":
                 let message = string(payload["last_assistant_message"]) ?? "\(provider.displayName) finished."
-                complete(task.id, outcome: "success", summary: message, at: now)
+                // Close every open task for this session (guards against duplicate running rows).
+                completeOpenTasks(provider: provider, sessionId: sessionId, outcome: "success", summary: message, at: now)
             case "StopFailure":
                 let message = string(payload["error"]) ?? "\(provider.displayName) failed."
-                complete(task.id, outcome: "failed", summary: message, at: now)
+                completeOpenTasks(provider: provider, sessionId: sessionId, outcome: "failed", summary: message, at: now)
             case "SessionEnd":
-                if let current = tasks[task.id], current.status != .completed {
-                    complete(task.id, outcome: "interrupted", summary: "\(provider.displayName) session ended.", at: now)
-                }
+                completeOpenTasks(
+                    provider: provider,
+                    sessionId: sessionId,
+                    outcome: "interrupted",
+                    summary: "\(provider.displayName) session ended.",
+                    at: now
+                )
             default:
                 update(task.id) {
                     if $0.status != .completed { $0.status = .running }
@@ -166,15 +205,51 @@ final class TaskStore: @unchecked Sendable {
         }
     }
 
+    private func completeOpenTasks(
+        provider: AgentKind,
+        sessionId: String,
+        outcome: String,
+        summary: String,
+        at: Date
+    ) {
+        let open = tasks.values.filter {
+            $0.agent == provider && $0.externalId == sessionId && $0.status != .completed
+        }
+        if open.isEmpty {
+            // Ensure we still record completion against the latest task row if needed.
+            if let latest = tasks.values
+                .filter({ $0.agent == provider && $0.externalId == sessionId })
+                .sorted(by: { $0.updatedAt > $1.updatedAt })
+                .first,
+               latest.status != .completed {
+                complete(latest.id, outcome: outcome, summary: summary, at: at)
+            }
+            return
+        }
+        for task in open {
+            complete(task.id, outcome: outcome, summary: summary, at: at)
+        }
+    }
+
     private func ensureTask(provider: AgentKind, sessionId: String, payload: [String: Any]) -> AgentTask {
+        let event = string(payload["hook_event_name"]) ?? string(payload["event"]) ?? ""
+
+        // A new user prompt after a completed turn should open a fresh task row.
+        // Reuse only the latest non-completed task for this session.
         if let existing = tasks.values
+            .filter({ $0.agent == provider && $0.externalId == sessionId && $0.status != .completed })
+            .sorted(by: { $0.updatedAt > $1.updatedAt })
+            .first {
+            return existing
+        }
+
+        // SessionEnd / Stop on an already-completed session: attach to latest row.
+        if event == "SessionEnd" || event == "Stop" || event == "StopFailure",
+           let latest = tasks.values
             .filter({ $0.agent == provider && $0.externalId == sessionId })
             .sorted(by: { $0.updatedAt > $1.updatedAt })
             .first {
-            let event = string(payload["hook_event_name"]) ?? ""
-            if existing.status != .completed || event == "SessionEnd" {
-                return existing
-            }
+            return latest
         }
 
         let cwd = string(payload["cwd"]) ?? string(payload["workspace_roots"]).flatMap { firstPath(in: $0) } ?? ""

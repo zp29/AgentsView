@@ -290,26 +290,49 @@ private struct TaskRow: View {
 
     @State private var hovering = false
 
+    private var stale: Bool {
+        model.isStale(task)
+    }
+
+    private var borderColor: Color {
+        if stale { return ABTheme.stale.opacity(hovering ? 0.95 : 0.80) }
+        return hovering ? ABTheme.lineStrong : ABTheme.line
+    }
+
+    private var borderWidth: CGFloat { stale ? 1.5 : 1 }
+
     var body: some View {
         Button(action: onOpen) {
             HStack(alignment: .top, spacing: 10) {
-                // left accent rail
+                // left accent rail (orange when idle ≥ 45m)
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(task.status.accent)
+                    .fill(stale ? ABTheme.stale : task.status.accent)
                     .frame(width: 3, height: 34)
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         AgentBadge(agent: task.agent, compact: true)
-                        Text(NameFormatter.truncate(model.displayName(for: task), limit: 34))
+                        Text(NameFormatter.truncate(model.displayName(for: task), limit: 30))
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(ABTheme.text)
                             .lineLimit(1)
+                        if stale {
+                            Text("久未活动")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundStyle(ABTheme.stale)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(ABTheme.stale.opacity(0.14))
+                                .overlay(
+                                    Capsule().strokeBorder(ABTheme.stale.opacity(0.45), lineWidth: 1)
+                                )
+                                .clipShape(Capsule())
+                        }
                         Spacer(minLength: 4)
                         Text(NameFormatter.relativeTime(task.updatedAt, now: now))
                             .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundStyle(ABTheme.textDim)
+                            .foregroundStyle(stale ? ABTheme.stale.opacity(0.9) : ABTheme.textDim)
                     }
 
                     HStack(spacing: 6) {
@@ -345,19 +368,51 @@ private struct TaskRow: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
-            .background(hovering ? ABTheme.bgSoft : ABTheme.bgElevated)
+            .background(
+                stale
+                    ? ABTheme.stale.opacity(hovering ? 0.10 : 0.06)
+                    : (hovering ? ABTheme.bgSoft : ABTheme.bgElevated)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(hovering ? ABTheme.lineStrong : ABTheme.line, lineWidth: 1)
+                    .strokeBorder(borderColor, lineWidth: borderWidth)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu { statusMenu }
         .onHover { value in
             withAnimation(.easeOut(duration: 0.12)) { hovering = value }
             if value { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .help(task.cwd.isEmpty ? model.displayName(for: task) : "在 Finder 中打开 \(task.cwd)")
+        .help(rowHelp)
+    }
+
+    @ViewBuilder
+    private var statusMenu: some View {
+        if task.status == .running || task.status == .waitingApproval {
+            Button("标记为完成") { model.markCompleted(task, outcome: "success") }
+            Button("标记为中断") { model.markCompleted(task, outcome: "interrupted") }
+            Divider()
+        }
+        if task.status == .completed {
+            Button("重新标记为运行中") { model.markRunning(task) }
+            Divider()
+        }
+        if !task.cwd.isEmpty {
+            Button("打开项目目录") { onOpen() }
+        }
+        Button("从列表移除", role: .destructive) { model.removeTask(task) }
+    }
+
+    private var rowHelp: String {
+        if stale {
+            return "超过 45 分钟无活动 — 右键可手动标记状态"
+        }
+        if task.status == .running || task.status == .waitingApproval {
+            return "右键可标记完成 / 中断；点击打开目录"
+        }
+        return task.cwd.isEmpty ? model.displayName(for: task) : "在 Finder 中打开 \(task.cwd)"
     }
 }

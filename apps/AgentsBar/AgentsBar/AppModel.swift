@@ -16,6 +16,10 @@ final class AppModel: ObservableObject {
     @Published var toast: String = ""
     @Published var showOnboarding: Bool
     @Published private(set) var clock = Date()
+    /// Brief "just completed" flash for the menu-bar icon border (auto-clears).
+    @Published private(set) var completionFlashActive = false
+    /// Explicit published ring so MenuBarExtra label always re-renders (computed-only can be skipped).
+    @Published private(set) var statusRing: StatusRing = .none
 
     private let store: TaskStore
     private var hub: LocalHub?
@@ -23,6 +27,10 @@ final class AppModel: ObservableObject {
     private var toastTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var clockTimer: Timer?
+    private var completionFlashTask: Task<Void, Never>?
+    private var previousRunningIds: Set<String> = []
+    private var previousCompletedIds: Set<String> = []
+    private let completionFlashDuration: TimeInterval = 5.5
 
     init() {
         let settings = AppSupport.loadSettings()
@@ -36,6 +44,7 @@ final class AppModel: ObservableObject {
         }
         startRuntime()
         startClock()
+        refreshFromStore(trackTransitions: false)
     }
 
     
@@ -51,9 +60,8 @@ final class AppModel: ObservableObject {
     }
 
     var shouldShowBarCount: Bool {
-        // Always show the number once live so empty "0" is honest, not demo noise.
-        if case .live = hubHealth { return true }
-        return counts.totalRunning > 0
+        // Hide the digit when nothing is running — bare logo only.
+        counts.totalRunning > 0
     }
 
     var statusColor: Color {
@@ -65,6 +73,41 @@ final class AppModel: ObservableObject {
             if counts.totalRunning > 0 { return ABTheme.running }
             if counts.totalCompletedToday > 0 { return ABTheme.completed }
             return ABTheme.offline
+        }
+    }
+
+    /// Menu-bar icon ring: waiting (amber-red) > running (green) > completion flash (red) > none.
+    enum StatusRing: Equatable {
+        case none
+        case running
+        case waiting
+        case completedFlash
+    }
+
+    var statusRingColor: Color {
+        switch statusRing {
+        case .none: return .clear
+        case .running: return ABTheme.ringRunning
+        case .waiting: return ABTheme.ringWaiting
+        case .completedFlash: return ABTheme.ringCompleted
+        }
+    }
+
+    private func recomputeStatusRing() {
+        let next: StatusRing
+        if case .failed = hubHealth {
+            next = .none
+        } else if counts.totalWaiting > 0 {
+            next = .waiting
+        } else if counts.totalRunning > 0 {
+            next = .running
+        } else if completionFlashActive {
+            next = .completedFlash
+        } else {
+            next = .none
+        }
+        if statusRing != next {
+            statusRing = next
         }
     }
 
@@ -193,6 +236,37 @@ final class AppModel: ObservableObject {
         flash("已清空全部任务（仅本地观察记录）")
     }
 
+    /// Open tasks with no hook activity for 45+ minutes (UI highlight only).
+    func isStale(_ task: AgentTask) -> Bool {
+        store.isStale(task, now: clock)
+    }
+
+    /// Manual status edit for observation list — does not control the real agent.
+    func markCompleted(_ task: AgentTask, outcome: String = "success") {
+        store.setStatus(
+            id: task.id,
+            status: .completed,
+            outcome: outcome,
+            summary: outcome == "interrupted"
+                ? "已手动标记为中断"
+                : "已手动标记为完成"
+        )
+        refreshFromStore()
+        flash(outcome == "interrupted" ? "已标记为中断" : "已标记为完成")
+    }
+
+    func markRunning(_ task: AgentTask) {
+        store.setStatus(id: task.id, status: .running, outcome: nil)
+        refreshFromStore()
+        flash("已标记为运行中")
+    }
+
+    func removeTask(_ task: AgentTask) {
+        store.removeTasks(ids: [task.id])
+        refreshFromStore()
+        flash("已从列表移除")
+    }
+
     func flash(_ message: String) {
         toast = message
         toastTask?.cancel()
@@ -218,8 +292,10 @@ final class AppModel: ObservableObject {
                     case .success:
                         self.hubHealth = .live
                         self.refreshFromStore()
+                        self.recomputeStatusRing()
                     case .failure(let error):
                         self.hubHealth = .failed(error.localizedDescription)
+                        self.recomputeStatusRing()
                         self.flash("Hub 启动失败：\(error.localizedDescription)")
                     }
                 }
@@ -240,12 +316,42 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func refreshFromStore() {
-        tasks = store.snapshot()
+    private func refreshFromStore(trackTransitions: Bool = true) {
+        // Never auto-complete on timeout — only refresh UI / relative times / stale highlights.
+        let snapshot = store.snapshot()
+        tasks = snapshot
         counts = store.counts(now: clock)
+
+        let runningIds = Set(snapshot.filter { $0.status == .running }.map(\.id))
+        let completedIds = Set(snapshot.filter { $0.status == .completed }.map(\.id))
+
+        if trackTransitions {
+            let finishedRunning = previousRunningIds.subtracting(runningIds)
+            if !finishedRunning.isEmpty {
+                triggerCompletionFlash()
+            }
+        }
+
+        previousRunningIds = runningIds
+        previousCompletedIds = completedIds
+        recomputeStatusRing()
+    }
+
+    private func triggerCompletionFlash() {
+        completionFlashActive = true
+        recomputeStatusRing()
+        completionFlashTask?.cancel()
+        completionFlashTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(completionFlashDuration * 1_000_000_000))
+            if !Task.isCancelled {
+                completionFlashActive = false
+                recomputeStatusRing()
+            }
+        }
     }
 
     private func startClock() {
+        // Tick for relative timestamps + 45m stale highlight refresh (no auto-complete).
         let timer = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.clock = Date()

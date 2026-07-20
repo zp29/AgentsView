@@ -8,6 +8,9 @@ AgentsView 是一个面向 **Codex 与 Claude 编码代理**的轻量 Web 运行
 
 ## 运行起来是什么样子
 
+![AgentsView Demo](https://i.imgur.com/2xb1QXV.png)
+![AgentsView Demo](https://i.imgur.com/t2x3v0G.png)
+
 登录后首先看到三个状态星区：
 
 - **运行中**：正在推理、调用工具或执行命令的任务。

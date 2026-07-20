@@ -1,11 +1,15 @@
 # AgentsView
 
-AgentsView 是一个面向 **Codex 与 Claude 编码代理**的轻量 Web 运行台：在浏览器里用“星图”查看多个任务的运行状态，在手机上处理待审批请求，并保留可追踪的审批审计记录。
+本仓库包含两个**运行时互不依赖**的产品：
 
-界面提供中文 / English 切换，并针对手机竖屏做了响应式设计。
+| | 产品 | 说明 |
+| --- | --- | --- |
+| [`web/`](./web/) | **AgentsView** | 面向 **Codex 与 Claude** 的轻量 Web 运行台：浏览器「星图」查看任务、手机处理审批、可追踪审计。默认 `127.0.0.1:4173`。 |
+| [`apps/AgentsBar/`](./apps/AgentsBar/) | **AgentsBar** | 独立 **macOS 菜单栏**观察器：安装即用，内置 Local Hub，只观察真实 CLI 会话。默认 `127.0.0.1:18273`。 |
 
-> English: AgentsView is a mobile-friendly, bilingual web console for monitoring Codex and Claude coding agents and handling narrowly scoped approval requests.
+Web 界面提供中文 / English 切换，并针对手机竖屏做了响应式设计。
 
+> English: AgentsView is a mobile-friendly, bilingual web console for monitoring Codex and Claude coding agents and handling narrowly scoped approval requests. AgentsBar is a standalone macOS menu bar observer that does not require the Node server.
 ## 运行起来是什么样子
 
 ![AgentsView Demo](https://i.imgur.com/2xb1QXV.png)
@@ -252,29 +256,40 @@ npm run hooks:print
 
 除登录、健康检查与 Claude Hook 外，接口都需要有效浏览器会话。Claude Hook 不接受浏览器会话，必须提供独立共享密钥；它只接收受支持的生命周期和权限事件，不是通用命令入口。当前 MVP 有意不提供通用 shell、任意 stdin 转发、文件浏览器、多人 RBAC 或跨机器分布式调度。
 
-## AgentsBar（macOS 菜单栏）
+## AgentsBar（macOS 菜单栏 · v1）
 
-独立菜单栏观察器，**不依赖**本服务的 `npm start`。打开 App 即内置 Local Hub，首次向导可安装 Claude Code / Codex Hooks。
+独立 **macOS 14+** 菜单栏观察器，**不依赖**本仓库的 `npm start` / PM2。打开 App 即内置 Local Hub（`127.0.0.1:18273`），首次向导安装 Claude Code / Codex Hooks，只观察真实 CLI 会话。
 
-- 文档：[docs/menubar-app.md](./docs/menubar-app.md)
+| | 说明 |
+| --- | --- |
+| 状态栏 | 轨道 logo + **运行中总数**（为 0 时不显示数字）；有任务时绿色胶囊边框缓慢旋转，待处理为红橙，刚完成红闪后消失 |
+| 面板 | 运行中 / 今日完成列表；任务名默认 `{agent}-{cwd}-{title}`（CC / GPT 徽章） |
+| 久未活动 | 超过约 45 分钟无 Hook 的运行中任务在列表标「久未活动」（**不会**自动改成完成） |
+| 手动状态 | 右键任务行：标记完成 / 中断 / 重新运行中 / 移除 |
+| 审批 | **不做**；权限仍走 Claude Code / Codex 原生 UI |
+| 下载 | [GitHub Releases](https://github.com/zp29/AgentsView/releases) 的 `AgentsBar-*.dmg`（ad-hoc 签名，未 Apple 公证） |
+
+- 产品说明：[docs/menubar-app.md](./docs/menubar-app.md)
 - 工程与构建：[apps/AgentsBar/README.md](./apps/AgentsBar/README.md)
 
 ```bash
+# 从源码安装到 ~/Applications
 cd apps/AgentsBar && ./scripts/build.sh --install
 ```
 
+首次若被 Gatekeeper 拦截：系统设置 → 隐私与安全性 → 仍要打开。装好 Hooks 后需 **新开** Claude Code / Codex 会话才会出现任务。
+
 ### 发版（tag → DMG）
 
-推送 `v*` tag 后，GitHub Actions 自动构建 ad-hoc 签名的 DMG 并挂到 Release（无需 Apple 证书）：
+推送 `v*` tag 后，Actions **Release AgentsBar** 在 `macos-15` 上构建并上传 DMG（无需 Apple 证书 Secrets）：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
-# → Release: AgentsBar-0.1.0.dmg
+git tag v1.0.2
+git push origin v1.0.2
+# → https://github.com/zp29/AgentsView/releases  附件 AgentsBar-1.0.2.dmg
 ```
 
-本地打 DMG：`cd apps/AgentsBar && VERSION=0.1.0 ./scripts/build.sh && VERSION=0.1.0 ./scripts/package-dmg.sh`
-
+本地：`cd apps/AgentsBar && VERSION=1.0.2 ./scripts/build.sh && VERSION=1.0.2 ./scripts/package-dmg.sh`
 ## 项目结构
 
 ```text

@@ -1,32 +1,43 @@
 #!/usr/bin/env bash
 # AgentsBar hook relay — installed to Application Support (stable path).
 # Reads JSON from stdin, POSTs to the local AgentsBar hub, always exits 0 for CLI.
-set -euo pipefail
+# Codex Stop/SubagentStop require valid JSON on success — always print {}.
+set -u
 
 PROVIDER="${1:-}"
 if [[ "$PROVIDER" != "claude" && "$PROVIDER" != "codex" ]]; then
   echo "[AgentsBar] provider must be claude or codex" >&2
-  echo '{}'
+  printf '%s\n' '{}'
   exit 0
 fi
 
 SUPPORT="${HOME}/Library/Application Support/AgentsBar"
 SECRET_FILE="${SUPPORT}/hook-secret"
 PORT_FILE="${SUPPORT}/hub-port"
+DEBUG_FILE="${SUPPORT}/hook-debug.jsonl"
 PORT=18273
 if [[ -f "$PORT_FILE" ]]; then
-  PORT="$(tr -d '[:space:]' < "$PORT_FILE" || true)"
-  [[ -n "$PORT" ]] || PORT=18273
+  PORT="$(tr -d '[:space:]' < "$PORT_FILE" 2>/dev/null || true)"
+  [[ -n "${PORT:-}" ]] || PORT=18273
 fi
+
+log_debug() {
+  # Best-effort one-line debug; never fail the agent.
+  local reason="$1"
+  local ts
+  ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo unknown)"
+  printf '{"ts":"%s","source":"relay","provider":"%s","reason":"%s"}\n' "$ts" "$PROVIDER" "$reason" >>"$DEBUG_FILE" 2>/dev/null || true
+}
 
 if [[ ! -f "$SECRET_FILE" ]]; then
   echo "[AgentsBar] hook secret missing; open AgentsBar once" >&2
-  echo '{}'
+  log_debug "missing_secret"
+  printf '%s\n' '{}'
   exit 0
 fi
 
-SECRET="$(tr -d '[:space:]' < "$SECRET_FILE")"
-BODY="$(cat || true)"
+SECRET="$(tr -d '[:space:]' < "$SECRET_FILE" 2>/dev/null || true)"
+BODY="$(cat 2>/dev/null || true)"
 if [[ -z "${BODY//[[:space:]]/}" ]]; then
   BODY='{}'
 fi
@@ -34,20 +45,45 @@ fi
 # Validate JSON lightly; never block the agent on hub failure.
 if ! /usr/bin/python3 -c 'import json,sys; json.loads(sys.stdin.read() or "{}")' <<<"$BODY" 2>/dev/null; then
   echo "[AgentsBar] invalid JSON on stdin" >&2
-  echo '{}'
+  log_debug "invalid_json"
+  printf '%s\n' '{}'
   exit 0
 fi
 
 URL="http://127.0.0.1:${PORT}/hooks/${PROVIDER}"
-RESPONSE="$(/usr/bin/curl -sS -m 3 \
-  -X POST "$URL" \
-  -H "Content-Type: application/json" \
-  -H "X-AgentsBar-Hook-Secret: ${SECRET}" \
-  --data-binary "$BODY" 2>/dev/null || true)"
+# Prefer curl; fall back to python urllib if curl missing.
+RESPONSE=""
+if [[ -x /usr/bin/curl ]]; then
+  RESPONSE="$(/usr/bin/curl -sS -m 3 \
+    -X POST "$URL" \
+    -H "Content-Type: application/json" \
+    -H "X-AgentsBar-Hook-Secret: ${SECRET}" \
+    --data-binary "$BODY" 2>/dev/null || true)"
+else
+  RESPONSE="$(SECRET="$SECRET" URL="$URL" BODY="$BODY" /usr/bin/python3 - <<'PY' 2>/dev/null || true
+import os, urllib.request
+req = urllib.request.Request(
+    os.environ["URL"],
+    data=os.environ["BODY"].encode(),
+    headers={
+        "Content-Type": "application/json",
+        "X-AgentsBar-Hook-Secret": os.environ["SECRET"],
+    },
+    method="POST",
+)
+try:
+    print(urllib.request.urlopen(req, timeout=3).read().decode() or "{}")
+except Exception:
+    print("{}")
+PY
+)"
+fi
 
 if [[ -z "${RESPONSE//[[:space:]]/}" ]]; then
-  echo '{}'
+  log_debug "hub_empty_or_unreachable"
+  printf '%s\n' '{}'
 else
-  printf '%s' "$RESPONSE"
+  # Ensure trailing newline for CLI parsers that expect a full line of JSON.
+  printf '%s\n' "$RESPONSE"
 fi
 exit 0

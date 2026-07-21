@@ -62,13 +62,17 @@ enum HookInstaller {
     ) throws {
         var root = (try? readObject(url)) ?? [:]
         var hooks = (root["hooks"] as? [String: Any]) ?? [:]
-        let command = shellQuote(relayPath) + " " + provider.rawValue
+        // Invoke via /bin/bash so paths with spaces (Application Support) are reliable.
+        // Codex runs command hooks with a shell; bare quoted paths can fail depending on executor.
+        let command = "/bin/bash \(shellQuote(relayPath)) \(provider.rawValue)"
+        // Codex matchers are regex; "*" / "" both mean "all". Prefer "*" for Codex docs examples.
+        let matcher = provider == .codex ? "*" : ""
 
         for event in events {
             var groups = (hooks[event] as? [[String: Any]]) ?? []
             groups = removeAgentsBar(groups: groups, relayPath: relayPath, provider: provider)
             groups.append([
-                "matcher": "",
+                "matcher": matcher,
                 "hooks": [[
                     "type": "command",
                     "command": command,

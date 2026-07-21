@@ -126,12 +126,17 @@ final class TaskStore: @unchecked Sendable {
     @discardableResult
     func handleHook(provider: AgentKind, payload: [String: Any]) throws -> [String: Any] {
         try queue.sync {
-            let event = string(payload["hook_event_name"]) ?? string(payload["event"]) ?? ""
-            let sessionId = string(payload["session_id"])
-                ?? string(payload["sessionId"])
-                ?? string(payload["conversation_id"])
-                ?? ""
+            // Normalize Claude + Codex field aliases into one shape.
+            let event = Self.eventName(from: payload)
+            let sessionId = Self.sessionId(from: payload)
             guard !event.isEmpty, !sessionId.isEmpty else {
+                Self.debugLog(
+                    provider: provider,
+                    reason: "missing event/session",
+                    event: event,
+                    sessionId: sessionId,
+                    payload: payload
+                )
                 throw HubError.badRequest("hook_event_name and session_id are required")
             }
 
@@ -161,7 +166,7 @@ final class TaskStore: @unchecked Sendable {
 
             // Slash commands like `/model …` are not real tasks.
             if event == "UserPromptSubmit" {
-                let prompt = string(payload["prompt"]) ?? ""
+                let prompt = Self.promptText(from: payload)
                 if Self.isIgnorablePrompt(prompt) {
                     return [:]
                 }
@@ -209,7 +214,7 @@ final class TaskStore: @unchecked Sendable {
 
             switch event {
             case "UserPromptSubmit":
-                let prompt = string(payload["prompt"]) ?? ""
+                let prompt = Self.promptText(from: payload)
                 update(task.id) {
                     $0.status = .running
                     $0.updatedAt = now
@@ -223,12 +228,15 @@ final class TaskStore: @unchecked Sendable {
                     }
                 }
             case "PreToolUse", "PostToolUse", "PostToolUseFailure", "SubagentStart", "SubagentStop":
-                let tool = string(payload["tool_name"]) ?? string(payload["agent_type"]) ?? event
+                let tool = string(payload["tool_name"])
+                    ?? string(payload["agent_type"])
+                    ?? string(payload["tool"])
+                    ?? event
                 let detail = Self.toolDetail(payload)
                 update(task.id) {
                     if $0.status != .completed { $0.status = .running }
                     $0.updatedAt = now
-                    $0.summary = "\(tool): \(detail)"
+                    $0.summary = detail.isEmpty ? tool : "\(tool): \(detail)"
                 }
             default:
                 // Unknown lifecycle noise (e.g. future hook names) — do not invent tasks.
@@ -320,11 +328,12 @@ final class TaskStore: @unchecked Sendable {
 
         guard createIfMissing else { return nil }
 
-        let cwd = string(payload["cwd"]) ?? string(payload["workspace_roots"]).flatMap { firstPath(in: $0) } ?? ""
+        let cwd = Self.cwd(from: payload)
         let project = URL(fileURLWithPath: cwd.isEmpty ? "/" : cwd).lastPathComponent
-        let prompt = string(payload["prompt"]) ?? ""
+        let prompt = Self.promptText(from: payload)
         let titleFromPrompt = prompt.isEmpty ? nil : Self.shortTitle(from: prompt, fallback: "")
         let title = string(payload["session_title"])
+            ?? string(payload["title"])
             ?? (titleFromPrompt.flatMap { $0.isEmpty ? nil : $0 })
             ?? (project.isEmpty ? "\(provider.displayName) session" : "\(provider.displayName) · \(project)")
         let now = Date()
@@ -403,12 +412,71 @@ final class TaskStore: @unchecked Sendable {
     }
 
     private func string(_ value: Any?) -> String? {
-        if let s = value as? String { return s }
+        Self.stringValue(value)
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        if let s = value as? String {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
         if let n = value as? NSNumber { return n.stringValue }
         return nil
     }
 
-    private func firstPath(in raw: String) -> String? {
+    private static func eventName(from payload: [String: Any]) -> String {
+        stringValue(payload["hook_event_name"])
+            ?? stringValue(payload["hookEventName"])
+            ?? stringValue(payload["event"])
+            ?? stringValue(payload["event_name"])
+            ?? stringValue(payload["type"])
+            ?? ""
+    }
+
+    private static func sessionId(from payload: [String: Any]) -> String {
+        stringValue(payload["session_id"])
+            ?? stringValue(payload["sessionId"])
+            ?? stringValue(payload["conversation_id"])
+            ?? stringValue(payload["conversationId"])
+            ?? stringValue(payload["thread_id"])
+            ?? stringValue(payload["threadId"])
+            // Last resort: turn-scoped only events can still group by turn when session is absent.
+            ?? stringValue(payload["turn_id"])
+            ?? stringValue(payload["turnId"])
+            ?? ""
+    }
+
+    private static func promptText(from payload: [String: Any]) -> String {
+        if let prompt = stringValue(payload["prompt"]) { return prompt }
+        if let message = stringValue(payload["message"]) { return message }
+        if let text = stringValue(payload["text"]) { return text }
+        if let content = stringValue(payload["content"]) { return content }
+        if let arr = payload["content"] as? [Any] {
+            let joined = arr.compactMap { item -> String? in
+                if let s = item as? String { return s }
+                if let obj = item as? [String: Any] {
+                    return stringValue(obj["text"]) ?? stringValue(obj["content"])
+                }
+                return nil
+            }.joined(separator: "\n")
+            if !joined.isEmpty { return joined }
+        }
+        return ""
+    }
+
+    private static func cwd(from payload: [String: Any]) -> String {
+        if let cwd = stringValue(payload["cwd"]) { return cwd }
+        if let roots = payload["workspace_roots"] as? [String], let first = roots.first, !first.isEmpty {
+            return first
+        }
+        if let roots = stringValue(payload["workspace_roots"]) {
+            return firstPath(in: roots) ?? roots
+        }
+        if let dir = stringValue(payload["working_directory"]) { return dir }
+        return ""
+    }
+
+    private static func firstPath(in raw: String) -> String? {
         if raw.hasPrefix("["), let data = raw.data(using: .utf8),
            let arr = try? JSONSerialization.jsonObject(with: data) as? [String] {
             return arr.first
@@ -424,7 +492,10 @@ final class TaskStore: @unchecked Sendable {
     }
 
     private static func toolDetail(_ payload: [String: Any]) -> String {
-        if let input = payload["tool_input"] as? [String: Any] {
+        let input = (payload["tool_input"] as? [String: Any])
+            ?? (payload["input"] as? [String: Any])
+            ?? (payload["arguments"] as? [String: Any])
+        if let input {
             if let command = input["command"] as? String { return String(command.prefix(160)) }
             if let path = input["file_path"] as? String ?? input["path"] as? String {
                 return URL(fileURLWithPath: path).lastPathComponent
@@ -435,6 +506,41 @@ final class TaskStore: @unchecked Sendable {
             }
         }
         return ""
+    }
+
+    /// Append a short debug line when Codex/Claude payloads are dropped or malformed.
+    private static func debugLog(
+        provider: AgentKind,
+        reason: String,
+        event: String,
+        sessionId: String,
+        payload: [String: Any]
+    ) {
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/AgentsBar", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("hook-debug.jsonl")
+        let keys = Array(payload.keys).sorted().joined(separator: ",")
+        let line = [
+            "ts": ISO8601DateFormatter().string(from: Date()),
+            "provider": provider.rawValue,
+            "reason": reason,
+            "event": event,
+            "session": sessionId,
+            "keys": keys,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: line),
+              var text = String(data: data, encoding: .utf8) else { return }
+        text += "\n"
+        if let handle = try? FileHandle(forWritingTo: file) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            if let bytes = text.data(using: .utf8) {
+                try? handle.write(contentsOf: bytes)
+            }
+        } else {
+            try? text.data(using: .utf8)?.write(to: file, options: .atomic)
+        }
     }
 
     private func stableHash(_ value: String) -> String {

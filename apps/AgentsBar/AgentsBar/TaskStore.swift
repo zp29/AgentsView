@@ -140,20 +140,74 @@ final class TaskStore: @unchecked Sendable {
                 return [:]
             }
 
-            let task = ensureTask(provider: provider, sessionId: sessionId, payload: payload)
+            // Model switch / resume / compact often emit SessionStart without real user work.
+            // Do not open a new task row for these — only refresh an already-open task.
+            if event == "SessionStart" {
+                let now = Date()
+                if let open = openTask(provider: provider, sessionId: sessionId) {
+                    update(open.id) {
+                        $0.status = .running
+                        $0.updatedAt = now
+                        // Keep existing title/summary; just note the session is alive.
+                        if $0.summary.isEmpty {
+                            $0.summary = "\(provider.displayName) session active."
+                        }
+                    }
+                    persistLocked()
+                    notifyLocked()
+                }
+                return [:]
+            }
+
+            // Slash commands like `/model …` are not real tasks.
+            if event == "UserPromptSubmit" {
+                let prompt = string(payload["prompt"]) ?? ""
+                if Self.isIgnorablePrompt(prompt) {
+                    return [:]
+                }
+            }
+
+            // Stop / SessionEnd without an open task: no-op (do not create rows just to close them).
+            if event == "Stop" || event == "StopFailure" || event == "SessionEnd" {
+                let now = Date()
+                let open = tasks.values.filter {
+                    $0.agent == provider && $0.externalId == sessionId && $0.status != .completed
+                }
+                if open.isEmpty { return [:] }
+                switch event {
+                case "Stop":
+                    let message = string(payload["last_assistant_message"]) ?? "\(provider.displayName) finished."
+                    completeOpenTasks(provider: provider, sessionId: sessionId, outcome: "success", summary: message, at: now)
+                case "StopFailure":
+                    let message = string(payload["error"]) ?? "\(provider.displayName) failed."
+                    completeOpenTasks(provider: provider, sessionId: sessionId, outcome: "failed", summary: message, at: now)
+                default:
+                    completeOpenTasks(
+                        provider: provider,
+                        sessionId: sessionId,
+                        outcome: "interrupted",
+                        summary: "\(provider.displayName) session ended.",
+                        at: now
+                    )
+                }
+                persistLocked()
+                notifyLocked()
+                return [:]
+            }
+
+            // Real work signals: user prompt or tool activity — create/reuse a task.
+            let createIfMissing = ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "SubagentStart", "SubagentStop"].contains(event)
+            guard let task = ensureTask(
+                provider: provider,
+                sessionId: sessionId,
+                payload: payload,
+                createIfMissing: createIfMissing
+            ) else {
+                return [:]
+            }
             let now = Date()
 
             switch event {
-            case "SessionStart":
-                update(task.id) {
-                    if $0.status == .completed {
-                        // New logical task if a completed session restarts — handled by ensureTask.
-                    } else {
-                        $0.status = .running
-                        $0.updatedAt = now
-                        $0.summary = "\(provider.displayName) session started."
-                    }
-                }
             case "UserPromptSubmit":
                 let prompt = string(payload["prompt"]) ?? ""
                 update(task.id) {
@@ -176,33 +230,54 @@ final class TaskStore: @unchecked Sendable {
                     $0.updatedAt = now
                     $0.summary = "\(tool): \(detail)"
                 }
-            case "Stop":
-                let message = string(payload["last_assistant_message"]) ?? "\(provider.displayName) finished."
-                // Close every open task for this session (guards against duplicate running rows).
-                completeOpenTasks(provider: provider, sessionId: sessionId, outcome: "success", summary: message, at: now)
-            case "StopFailure":
-                let message = string(payload["error"]) ?? "\(provider.displayName) failed."
-                completeOpenTasks(provider: provider, sessionId: sessionId, outcome: "failed", summary: message, at: now)
-            case "SessionEnd":
-                completeOpenTasks(
-                    provider: provider,
-                    sessionId: sessionId,
-                    outcome: "interrupted",
-                    summary: "\(provider.displayName) session ended.",
-                    at: now
-                )
             default:
-                update(task.id) {
-                    if $0.status != .completed { $0.status = .running }
-                    $0.updatedAt = now
-                    $0.summary = event
-                }
+                // Unknown lifecycle noise (e.g. future hook names) — do not invent tasks.
+                return [:]
             }
 
             persistLocked()
             notifyLocked()
             return [:]
         }
+    }
+
+    /// Slash commands / control prompts that should not become observed tasks.
+    private static func isIgnorablePrompt(_ prompt: String) -> Bool {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+
+        let lower = trimmed.lowercased()
+        // Claude Code / Codex control commands (model switch, config, etc.)
+        let controlPrefixes = [
+            "/model", "/models",
+            "/config", "/settings",
+            "/help", "/status",
+            "/clear", "/compact", "/cost",
+            "/login", "/logout",
+            "/doctor", "/memory",
+            "/permissions", "/vim",
+            "/theme", "/bug",
+            "/exit", "/quit",
+        ]
+        if controlPrefixes.contains(where: { lower == $0 || lower.hasPrefix($0 + " ") || lower.hasPrefix($0 + "\n") }) {
+            return true
+        }
+
+        // Some UIs inject XML-ish system wrappers without real user text.
+        if lower.hasPrefix("<command-name>") || lower.hasPrefix("<command-message>") {
+            return true
+        }
+        if lower.contains("set model to") && trimmed.count < 80 {
+            return true
+        }
+        return false
+    }
+
+    private func openTask(provider: AgentKind, sessionId: String) -> AgentTask? {
+        tasks.values
+            .filter { $0.agent == provider && $0.externalId == sessionId && $0.status != .completed }
+            .sorted { $0.updatedAt > $1.updatedAt }
+            .first
     }
 
     private func completeOpenTasks(
@@ -231,30 +306,26 @@ final class TaskStore: @unchecked Sendable {
         }
     }
 
-    private func ensureTask(provider: AgentKind, sessionId: String, payload: [String: Any]) -> AgentTask {
-        let event = string(payload["hook_event_name"]) ?? string(payload["event"]) ?? ""
-
-        // A new user prompt after a completed turn should open a fresh task row.
+    /// Returns an open task for the session, or creates one when `createIfMissing` is true.
+    private func ensureTask(
+        provider: AgentKind,
+        sessionId: String,
+        payload: [String: Any],
+        createIfMissing: Bool
+    ) -> AgentTask? {
         // Reuse only the latest non-completed task for this session.
-        if let existing = tasks.values
-            .filter({ $0.agent == provider && $0.externalId == sessionId && $0.status != .completed })
-            .sorted(by: { $0.updatedAt > $1.updatedAt })
-            .first {
+        if let existing = openTask(provider: provider, sessionId: sessionId) {
             return existing
         }
 
-        // SessionEnd / Stop on an already-completed session: attach to latest row.
-        if event == "SessionEnd" || event == "Stop" || event == "StopFailure",
-           let latest = tasks.values
-            .filter({ $0.agent == provider && $0.externalId == sessionId })
-            .sorted(by: { $0.updatedAt > $1.updatedAt })
-            .first {
-            return latest
-        }
+        guard createIfMissing else { return nil }
 
         let cwd = string(payload["cwd"]) ?? string(payload["workspace_roots"]).flatMap { firstPath(in: $0) } ?? ""
         let project = URL(fileURLWithPath: cwd.isEmpty ? "/" : cwd).lastPathComponent
+        let prompt = string(payload["prompt"]) ?? ""
+        let titleFromPrompt = prompt.isEmpty ? nil : Self.shortTitle(from: prompt, fallback: "")
         let title = string(payload["session_title"])
+            ?? (titleFromPrompt.flatMap { $0.isEmpty ? nil : $0 })
             ?? (project.isEmpty ? "\(provider.displayName) session" : "\(provider.displayName) · \(project)")
         let now = Date()
         let id = "\(provider.rawValue)-\(stableHash(sessionId))-\(String(UUID().uuidString.prefix(8)).lowercased())"
@@ -264,7 +335,9 @@ final class TaskStore: @unchecked Sendable {
             status: .running,
             title: String(title.prefix(160)),
             cwd: String(cwd.prefix(1000)),
-            summary: "\(provider.displayName) session connected.",
+            summary: prompt.isEmpty
+                ? "\(provider.displayName) is working."
+                : String(prompt.prefix(200)),
             externalId: sessionId,
             startedAt: now,
             updatedAt: now,

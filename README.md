@@ -5,7 +5,7 @@
 | | 产品 | 说明 |
 | --- | --- | --- |
 | [`web/`](./web/) | **AgentsView** | 面向 **Codex 与 Claude** 的轻量 Web 运行台：浏览器「星图」查看任务、手机处理审批、可追踪审计。默认 `127.0.0.1:4173`。 |
-| [`apps/AgentsBar/`](./apps/AgentsBar/) | **AgentsBar** | 独立 **macOS 菜单栏**观察器：安装即用，内置 Local Hub，只观察真实 CLI 会话。默认 `127.0.0.1:18273`。 |
+| [`apps/AgentsBar/`](./apps/AgentsBar/) | **AgentsBar** | 独立 **macOS 菜单栏**观察器：安装即用，内置 Local Hub，只观察真实本机代理会话。默认 `127.0.0.1:18273`。 |
 
 Web 界面提供中文 / English 切换，并针对手机竖屏做了响应式设计。
 
@@ -258,7 +258,7 @@ npm run hooks:print
 
 ## AgentsBar（macOS 菜单栏 · v1）
 
-独立 **macOS 14+** 菜单栏观察器，**不依赖**本仓库的 `npm start` / PM2。打开 App 即内置 Local Hub（`127.0.0.1:18273`），首次向导安装 Claude Code / Codex Hooks，只观察真实 CLI 会话。
+独立 **macOS 14+** 菜单栏观察器，**不依赖**本仓库的 `npm start` / PM2。打开 App 即内置 Local Hub（`127.0.0.1:18273`），首次向导安装 Claude Code / Codex Hooks，只观察真实本机代理会话。
 
 | | 说明 |
 | --- | --- |
@@ -278,6 +278,26 @@ cd apps/AgentsBar && ./scripts/build.sh --install
 ```
 
 首次若被 Gatekeeper 拦截：系统设置 → 隐私与安全性 → 仍要打开。装好 Hooks 后需 **新开** Claude Code / Codex 会话才会出现任务。
+
+### Codex Hooks 需要显式信任
+
+Codex 会读取 `~/.codex/hooks.json`，但不会执行尚未信任的用户命令 Hook。此时 AgentsBar 的 Local Hub 即使正常运行，ChatGPT 桌面客户端和 VS Code / Windsurf 中的 Codex 插件也不会上报任务状态。
+
+首次安装或重新安装 AgentsBar Hooks 后，在终端运行一次：
+
+```bash
+codex
+```
+
+Codex 提示 Hooks 为新增或已变更时，检查并信任 AgentsBar 安装的命令。命令路径应指向当前用户的 Application Support 目录，例如：
+
+```text
+/bin/bash '/Users/you/Library/Application Support/AgentsBar/bin/agentsbar-hook' codex
+```
+
+不要信任来源不明的其他 Hook 命令。完成审查后，完全退出并重新打开 ChatGPT / VS Code / Windsurf，再新建 Codex 任务；已经打开的任务不会被补接。以后若 `~/.codex/hooks.json` 被修改，Codex 可能将 Hook 标记为 `untrusted` 或 `modified`，需要重新审查。
+
+若 Claude Code 状态正常而 Codex 始终没有任务，优先检查 Codex Hook 信任状态，而不是先排查 AgentsBar 端口。安装成功只代表配置已写入，不代表 Codex 已授权执行其中的本地命令。
 
 ### 发版（tag → DMG）
 
